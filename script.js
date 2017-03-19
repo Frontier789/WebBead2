@@ -66,6 +66,13 @@ vec2_t.prototype = {
 			return vec2(this.x / v,this.y / v);
 		}
 	},
+	rem: function(v) {
+		if (v instanceof vec2_t) {
+			return vec2(this.x % v.x,this.y % v.y);
+		} else {
+			return vec2(this.x % v,this.y % v);
+		}
+	},
 	eq: function(v) {
 		return this.x == v.x && this.y == v.y;
 	},
@@ -154,21 +161,34 @@ Transition.prototype = {
 
 /* * * * * * * * * * FIELD TYPE * * * * * * * * * */
 var Field_size  = vec2(85,85);
-var Field_scale = 0.5;
+var Field_scale = 0.55;
 var FieldT = {
-	Laser  : {sprite_p: vec2(3,0)},
-	Mirror : {sprite_p: vec2(2,0)},
+	Laser      : {sprite_p: vec2(3,0)},
+	Mirror     : {sprite_p: vec2(2,0)},
+	Gate       : {sprite_p: vec2(1,0)},
+	Block      : {sprite_p: vec2(0,0)},
+	MirrorPass : {sprite_p: vec2(0,1)},
+	MirrorMono : {sprite_p: vec2(1,1)},
+	getRandom: function() {
+		var r = Math.random()*100;
+		if (r < 16) return this.Laser     ; r -= 16;
+		if (r < 16) return this.Mirror    ; r -= 16;
+		if (r < 16) return this.Gate      ; r -= 16;
+		if (r < 16) return this.Block     ; r -= 16;
+		if (r < 16) return this.MirrorPass; r -= 16;
+		return this.MirrorMono;
+	}
 };
 
-function Field(p, type, rot) {
+function Field(p, type, rot, scl) {
 	this.pos  = p    || 0;
 	this.type = type || 0;
 	this.rot  = rot  || 0;
-	this.draw_scale = 1.0;
+	this.draw_scale = scl || 1.0;
 	
 	this.pos_transition = new Transition(p,p,0);
 	this.rot_transition = new Transition(rot,rot,0);
-	this.scl_transition = new Transition(1.0,1.0,0);
+	this.scl_transition = new Transition(this.draw_scale,this.draw_scale,0);
 };
 
 Field.prototype = {
@@ -213,27 +233,41 @@ Field.prototype = {
 var Drawer = {
 	fields: [],
 	width: 100,
+	offsety: 5,
+	getItemPerRow: function() {
+		var itemPerRow = Math.floor(this.width / (Field_size.x * Field_scale));
+		if (itemPerRow < 1) itemPerRow = 1;
+		return itemPerRow;
+	},
 	draw: function() {
+		var itemPerRow = this.getItemPerRow();
+		
+		drawGrid(vec2(itemPerRow,Math.floor(canvas.height / (Field_size.y * Field_scale))),
+				 Field_size.mul(Field_scale),
+				 vec2(canvas.width - this.width,this.offsety),
+				 ["#cfcfcf","#000000"],[1.5,0.1]);
+		
 		this.fields.forEach(function(ff) {
 			ff.draw();
 		});
+		
 	},
 	getPosFromIndex: function(n) {
-		var itemPerRow = Math.floor(this.width / (Field_size.x * Field_scale));
-		if (itemPerRow < 1) itemPerRow = 1;
+		var itemPerRow = this.getItemPerRow();
 		var row = Math.floor(n / itemPerRow);
 		var col = n % itemPerRow;
 		
-		return vec2(col,row).mul(Field_size.mul(Field_scale)).add(vec2(canvas.width - this.width + Field_size.x * Field_scale / 2,Field_size.x * Field_scale / 2));
+		return vec2(col,row).mul(Field_size.mul(Field_scale)).add(vec2(canvas.width - this.width + Field_size.x * Field_scale / 2,this.offsety + Field_size.x * Field_scale / 2));
 	},
 	loadItems: function(items) {
 		(function(the_drawer) {
 		items.forEach(function(i,n) {
-			the_drawer.fields.push(new Field(the_drawer.getPosFromIndex(n),i));
+			the_drawer.fields.push(new Field(the_drawer.getPosFromIndex(n),i,0,0.95));
 		})})(this);
 	},
 	addItem: function(item) {
 		item.setPos(this.getPosFromIndex(this.fields.length));
+		item.setDrawScale(0.95);
 		this.fields.push(item);
 	},
 	remItem: function(index) {
@@ -243,24 +277,157 @@ var Drawer = {
 		}
 		return ret;
 	},
+	findIdFromPos: function(p) {
+		var s = Field_size.mul(Field_scale);
+		for (i in this.fields) {
+			var midp = this.getPosFromIndex(i);
+			if (p.x > midp.x - s.x/2 && p.x < midp.x + s.x/2 && 
+				p.y > midp.y - s.y/2 && p.y < midp.y + s.y/2)
+			{
+				return i;
+			}
+		}
+		return -1;
+	},
 	handlePress: function(p) {
 		if (!isDraggingField())
 		{
-			var s = Field_size.mul(Field_scale);
-			for (i in this.fields) {
-				var midp = this.getPosFromIndex(i);
-				if (p.x > midp.x - s.x/2 && p.x < midp.x + s.x/2 && 
-					p.y > midp.y - s.y/2 && p.y < midp.y + s.y/2)
+			var i = this.findIdFromPos(p);
+			if (i != -1)
+			{
+				dragField = this.remItem(i);
+				dragField.setDrawScale(1.05);
+				dragField.setPos(p);				
+			}
+		}
+	},
+	handleRightPress: function(p) {
+		if (!isDraggingField())
+		{
+			var i = this.findIdFromPos(p);
+			if (i != -1)
+			{
+				this.fields[i].setRot(this.fields[i].rot + 90);
+			}
+		}
+	}
+};
+
+Drawer.loadItems([FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom()]);
+
+
+
+
+
+/* * * * * * * * * * GAMEMAP CLASS * * * * * * * * * */
+function Map_element(field, fixed) {
+	this.field = field || null;
+	this.fixed = fixed || false;
+};
+
+Map_element.prototype = {};
+
+var Map = {
+	fields: [],
+	size: vec2(),
+	offset: vec2(5,5),
+	resize: function(size) {
+		this.fields = [];
+		this.size = size;
+		for (var x = 0;x < size.x;++x) {
+			this.fields.push([]);
+			for (var y = 0;y < size.y;++y) {
+				this.fields[x].push(new Map_element());
+			}
+		}
+	},
+	getPosFromIndex: function(index) {
+		return index.mul(Field_size.mul(Field_scale)).add(this.offset).add(Field_size.mul(Field_scale).div(2));
+	},
+	draw: function() {
+		drawGrid(this.size,
+				 Field_size.mul(Field_scale),
+				 this.offset,
+				 ["#cfcfcf","#000000"],[1.5,0.1]);
+		
+		for (x of this.fields) {
+			for (y of x) {
+				if (y.field != null) {
+					y.field.draw();
+				}
+			}
+		}
+	},
+	set: function(p,item) {
+		if (this.fields[p.x][p.y].fixed == false) {
+			item.setPos(this.getPosFromIndex(p));
+			item.setDrawScale(0.95);
+			
+			var tmp = this.fields[p.x][p.y].field;
+			
+			this.fields[p.x][p.y].field = item;
+			
+			if (tmp != null) {
+				tmp.setDrawScale(1.05);
+			}
+			
+			return tmp;
+		}
+		return -1;
+	},
+	remItem: function(index) {
+		var ret = this.fields[index.x][index.y].field;
+		this.fields[index.x][index.y].field = null;
+		return ret;
+	},
+	findIdFromPos: function(p) {
+		var s = Field_size.mul(Field_scale);
+		for (var x = 0;x < this.fields.length;x++) {
+			for (var y = 0;y < this.fields[x].length;y++) {
+				var midp = this.getPosFromIndex(vec2(x,y));
+				
+				if (this.fields[x][y].field != null)
 				{
-					dragField = this.remItem(i);
-					break;
+					if (p.x > midp.x - s.x/2 && p.x < midp.x + s.x/2 && 
+						p.y > midp.y - s.y/2 && p.y < midp.y + s.y/2)
+					{
+						return vec2(x,y);
+					}
+				}
+			}
+		}
+		return vec2(-1,-1);
+	},
+	handlePress: function(p) {
+		if (!isDraggingField())
+		{
+			var i = this.findIdFromPos(p); 
+			if (i.x != -1)
+			{
+				dragField = this.remItem(i);
+				dragField.setDrawScale(1.05);
+				dragField.setPos(p);				
+			}
+		}
+	},
+	handleRightPress: function(p) {
+		if (!isDraggingField())
+		{
+			var i = this.findIdFromPos(p); 
+			if (i.x != -1)
+			{
+				if (this.fields[i.x][i.y].field != null)
+				{
+					this.fields[i.x][i.y].field.setRot(this.fields[i.x][i.y].field.rot + 90);
 				}
 			}
 		}
 	}
 };
 
-Drawer.loadItems([FieldT.Laser,FieldT.Laser,FieldT.Mirror,FieldT.Laser,FieldT.Mirror,FieldT.Mirror,FieldT.Laser,FieldT.Mirror]);
+Map.resize(vec2(10,10));
+Map.fields[0][0].fixed = true;
+
 
 
 
@@ -273,19 +440,90 @@ var isDraggingField = function() {
 	return dragField instanceof Field;
 };
 
+var drawGrid = function(cell_count,cell_size,p,colors,widths) {
+	
+	ctx.beginPath();
+	ctx.lineWidth = widths[0];
+	ctx.strokeStyle = colors[0];
+	ctx.moveTo(p.x + 0.5,p.y + 0.5);
+	ctx.lineTo(p.x + cell_size.x * cell_count.x + 0.5,p.y + 0.5);
+	ctx.lineTo(p.x + cell_size.x * cell_count.x + 0.5,p.y + cell_size.y * cell_count.y + 0.5);
+	ctx.lineTo(p.x + 0.5,p.y + cell_size.y * cell_count.y + 0.5);
+	ctx.lineTo(p.x + 0.5,p.y + 0.5);
+	ctx.closePath();
+	
+	ctx.stroke();
+	
+	
+	ctx.beginPath();
+	ctx.lineWidth = widths[1];
+	ctx.strokeStyle = colors[1];
+	for (var x = 1;x < cell_count.x;x++) {
+		ctx.moveTo(p.x + cell_size.x * x + 0.5,p.y);
+		ctx.lineTo(p.x + cell_size.x * x + 0.5,p.y + cell_size.y * cell_count.y);
+	}
+	
+	for (var y = 1;y < cell_count.y;y++) {
+		ctx.moveTo(p.x,p.y + cell_size.y * y + 0.5);
+		ctx.lineTo(p.x + cell_size.x * cell_count.x,p.y + cell_size.y * y + 0.5);
+	}
+	ctx.closePath();
+	
+	ctx.stroke();
+};
+
+var handleDragDrop = function(p) {
+	
+	if (p.x > Map.offset.x && p.y > Map.offset.y &&
+		p.x < Map.offset.x + Map.size.x * Field_size.x * Field_scale && 
+		p.y < Map.offset.y + Map.size.y * Field_size.y * Field_scale)
+	{
+		var map_p = p.sub(Map.offset).div(Field_size.mul(Field_scale));
+		map_p.x = Math.floor(map_p.x);
+		map_p.y = Math.floor(map_p.y);
+		
+		var field = Map.set(map_p,dragField);
+		if (field == -1)
+		{
+			Drawer.addItem(dragField);
+			dragField = null;
+		}
+		else
+		{
+			dragField = field;
+			if (dragField != null) 
+			{
+				console.log(dragField);
+				dragField.setPos(p);
+			}
+		}
+	}
+	else
+	{
+		Drawer.addItem(dragField);
+		dragField = null;
+	}
+};
 
 /* * * * * * * * * * RENDERING METHOD * * * * * * * * * */
 render = function () {
 	
 	ctx.clearRect(0,0,canvas.width,canvas.height);
 	
+	Map.draw();
 	Drawer.draw();
 	if (isDraggingField()) {
 		dragField.draw();
 	}
 };
 
+
+
+
 /* * * * * * * * * * LISTENERS * * * * * * * * * */
+var dragMode = 0;
+var dragBegP = vec2();
+var dragTime = new Date();
 
 window.onkeydown = function(e) {
 	if (isDraggingField())
@@ -301,24 +539,70 @@ window.onkeyup = function(e) {
 	
 };
 
+canvas.onmouseleave = function(e) {
+	if (isDraggingField())
+	{
+		Drawer.addItem(dragField);
+		dragField = null;
+	}
+}
+
 canvas.onmousedown = function(e) {
 	if (e.button == 2)
 	{
+		var p = vec2(e.layerX - canvas.offsetLeft,e.layerY - canvas.offsetTop);
 		if (isDraggingField())
 		{
 			dragField.setRot(dragField.rot + 90);
 		}
+		else
+		{
+			Drawer.handleRightPress(p);
+			Map.handleRightPress(p);
+		}
 	}
 	if (e.button == 0)
 	{
+		var p = vec2(e.layerX - canvas.offsetLeft,e.layerY - canvas.offsetTop);
 		if (isDraggingField())
 		{
-			Drawer.addItem(dragField);
-			dragField = null;
+			handleDragDrop(p);
 		}
 		else
 		{
-			Drawer.handlePress(vec2(e.layerX - canvas.offsetLeft,e.layerY - canvas.offsetTop));
+			Drawer.handlePress(p);
+			Map.handlePress(p);
+			dragMode  = 0;
+			dragBegP  = p;
+			dragTime  = new Date();
+		}
+	}
+};
+
+canvas.onmouseup = function(e) {
+	if (e.button == 0)
+	{
+		var p = vec2(e.layerX - canvas.offsetLeft,e.layerY - canvas.offsetTop);
+		if (isDraggingField())
+		{
+			if (dragMode == 1)
+			{
+				handleDragDrop(p);
+				dragMode = 2;
+			}
+			else
+			{
+				var dt = ((new Date()) - dragTime) / 1000;
+				
+				if (dt < 0.3)
+				{
+					dragMode = 2;
+				}
+				else if (dragMode == 0)
+				{
+					handleDragDrop(p);
+				}
+			}
 		}
 	}
 };
@@ -328,6 +612,15 @@ canvas.onmousemove = function(e) {
 	{
 		var p = vec2(e.layerX - canvas.offsetLeft,e.layerY - canvas.offsetTop);
 		dragField.setPos(p);
+		
+		if (dragMode == 0)
+		{
+			if (Math.abs(dragBegP.x - p.x) > Field_size.x * Field_scale / 2 || 
+				Math.abs(dragBegP.y - p.y) > Field_size.y * Field_scale / 2)
+			{
+				dragMode = 1;
+			}			
+		}
 	}
 };
 
