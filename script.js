@@ -260,15 +260,19 @@ var FieldT = {
 	Gate       : {sprite_p: vec2(1,0), left: LaserT.Pass,       top: LaserT.Block,      right: LaserT.Pass,       bottom: LaserT.Block      },
 	Block      : {sprite_p: vec2(0,0), left: LaserT.Block,      top: LaserT.Block,      right: LaserT.Block,      bottom: LaserT.Block      },
 	MirrorPass : {sprite_p: vec2(0,1), left: LaserT.PassLeft,   top: LaserT.PassRight,  right: LaserT.PassLeft,   bottom: LaserT.PassRight  },
-	MirrorMono : {sprite_p: vec2(1,1), left: LaserT.Block,      top: LaserT.Block,      right: LaserT.MirrorLeft, bottom: LaserT.MirrorRight},
+	MirrorMono : {sprite_p: vec2(1,1), left: LaserT.FreeGoal,   top: LaserT.Block,      right: LaserT.MirrorLeft, bottom: LaserT.MirrorRight},
+	MirrorGoal : {sprite_p: vec2(2,1), left: LaserT.Goal,       top: LaserT.Block,      right: LaserT.MirrorLeft, bottom: LaserT.MirrorRight},
+	Goal       : {sprite_p: vec2(0,2), left: LaserT.Goal,       top: LaserT.Goal,       right: LaserT.Goal,       bottom: LaserT.Goal       },
 	Forbidden  : {sprite_p: vec2(3,1), left: LaserT.Pass,       top: LaserT.Pass,       right: LaserT.Pass,       bottom: LaserT.Pass       },
 	getRandom: function() {
 		var r = Math.random()*100;
-		if (r < 16) return this.Laser     ; r -= 16;
-		if (r < 16) return this.Mirror    ; r -= 16;
-		if (r < 16) return this.Gate      ; r -= 16;
-		if (r < 16) return this.Block     ; r -= 16;
-		if (r < 16) return this.MirrorPass; r -= 16;
+		if (r < 12) return this.Laser     ; r -= 12;
+		if (r < 12) return this.Mirror    ; r -= 12;
+		if (r < 12) return this.Gate      ; r -= 12;
+		if (r < 12) return this.Block     ; r -= 12;
+		if (r < 12) return this.MirrorPass; r -= 12;
+		if (r < 12) return this.MirrorGoal; r -= 12;
+		if (r < 12) return this.Goal      ; r -= 12;
 		return this.MirrorMono;
 	}
 };
