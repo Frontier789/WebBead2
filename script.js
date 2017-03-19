@@ -169,6 +169,7 @@ var FieldT = {
 	Block      : {sprite_p: vec2(0,0)},
 	MirrorPass : {sprite_p: vec2(0,1)},
 	MirrorMono : {sprite_p: vec2(1,1)},
+	Forbidden  : {sprite_p: vec2(3,1)},
 	getRandom: function() {
 		var r = Math.random()*100;
 		if (r < 16) return this.Laser     ; r -= 16;
@@ -181,7 +182,7 @@ var FieldT = {
 };
 
 function Field(p, type, rot, scl) {
-	this.pos  = p    || 0;
+	this.pos  = p    || vec2();
 	this.type = type || 0;
 	this.rot  = rot  || 0;
 	this.draw_scale = scl || 1.0;
@@ -320,9 +321,10 @@ Drawer.loadItems([FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),Field
 
 
 /* * * * * * * * * * GAMEMAP CLASS * * * * * * * * * */
-function Map_element(field, fixed) {
-	this.field = field || null;
-	this.fixed = fixed || false;
+function Map_element(field, fixed, rotfix) {
+	this.field  = field || null;
+	this.fixed  = fixed || false;
+	this.rotfix = rotfix || false;
 };
 
 Map_element.prototype = {};
@@ -360,20 +362,24 @@ var Map = {
 	},
 	set: function(p,item) {
 		if (this.fields[p.x][p.y].fixed == false) {
-			item.setPos(this.getPosFromIndex(p));
-			item.setDrawScale(0.95);
 			
-			var tmp = this.fields[p.x][p.y].field;
-			
-			this.fields[p.x][p.y].field = item;
-			
-			if (tmp != null) {
-				tmp.setDrawScale(1.05);
-			}
-			
-			return tmp;
+			return this.forceSet(p,item);
 		}
 		return -1;
+	},
+	forceSet: function(p,item) {
+		item.setPos(this.getPosFromIndex(p));
+		item.setDrawScale(0.95);
+		
+		var tmp = this.fields[p.x][p.y].field;
+		
+		this.fields[p.x][p.y].field = item;
+		
+		if (tmp != null) {
+			tmp.setDrawScale(1.05);
+		}
+		
+		return tmp;
 	},
 	remItem: function(index) {
 		var ret = this.fields[index.x][index.y].field;
@@ -404,9 +410,12 @@ var Map = {
 			var i = this.findIdFromPos(p); 
 			if (i.x != -1)
 			{
-				dragField = this.remItem(i);
-				dragField.setDrawScale(1.05);
-				dragField.setPos(p);				
+				if (!this.fields[i.x][i.y].fixed)
+				{
+					dragField = this.remItem(i);
+					dragField.setDrawScale(1.05);
+					dragField.setPos(p);									
+				}
 			}
 		}
 	},
@@ -416,7 +425,8 @@ var Map = {
 			var i = this.findIdFromPos(p); 
 			if (i.x != -1)
 			{
-				if (this.fields[i.x][i.y].field != null)
+				if (this.fields[i.x][i.y].field != null && 
+					!this.fields[i.x][i.y].rotfix)
 				{
 					this.fields[i.x][i.y].field.setRot(this.fields[i.x][i.y].field.rot + 90);
 				}
@@ -426,8 +436,8 @@ var Map = {
 };
 
 Map.resize(vec2(10,10));
-Map.fields[0][0].fixed = true;
-
+Map.fields[5][5].fixed = true;
+Map.forceSet(vec2(5,5),new Field(Map.getPosFromIndex(vec2(5,5)),FieldT.Forbidden));
 
 
 
@@ -485,15 +495,17 @@ var handleDragDrop = function(p) {
 		var field = Map.set(map_p,dragField);
 		if (field == -1)
 		{
+			/*
 			Drawer.addItem(dragField);
 			dragField = null;
+			*/
+			dragField.setRot(dragField.rot + 360);
 		}
 		else
 		{
 			dragField = field;
 			if (dragField != null) 
 			{
-				console.log(dragField);
 				dragField.setPos(p);
 			}
 		}
