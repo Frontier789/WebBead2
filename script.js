@@ -91,6 +91,9 @@ vec2_t.prototype = {
 	len: function() {
 		return this.length();
 	},
+	perp: function() {
+		return vec2(-this.y,this.x);
+	},
 	norm: function() {
 		return this.div(this.length());
 	},
@@ -159,17 +162,106 @@ Transition.prototype = {
 };
 
 
+
+/* * * * * * * * * * LASER TYPE * * * * * * * * * */
+var LaserT = {
+	Block:       0,
+	Pass:        1,
+	Emit:        2,
+	MirrorRight: 3,
+	MirrorLeft:  4,
+	PassRight:   5,
+	PassLeft:    6
+};
+
+function LaserPos(p,v) {
+	this.pos = p || vec2();
+	this.vel = v || vec2();
+}
+
+LaserPos.prototype = {
+	rotObjDegs: function(degs) {
+		var rotN = Math.floor(degs / 90);
+		if (rotN < 0) rotN = rotN * -3;
+		
+		var tmpLaser = new LaserPos(vec2(),this.vel);
+		
+		for (var i = 0;i<rotN % 4;i++) {
+			tmpLaser.vel = tmpLaser.rotLeft();
+		}
+		
+		return tmpLaser.vel;
+	},
+	getSide: function(field) {
+		if (field == null) {
+			return LaserT.Pass;
+		}
+		
+		var vel = this.rotObjDegs(field.rot);
+		
+		if (Math.abs(vel.x) < Math.abs(vel.y)) {
+			if (vel.y < 0) {
+				return field.type.bottom;
+			} else {
+				return field.type.top;
+			}
+		} else {
+			if (vel.x < 0) {
+				return field.type.right;
+			} else {
+				return field.type.left;
+			}
+		}
+	},
+	rotLeft: function() {
+		if (Math.abs(this.vel.x) < Math.abs(this.vel.y)) {
+			if (this.vel.y < 0) {
+				return vec2(-1,0);
+			} else {
+				return vec2(1,0);
+			}
+		} else {
+			if (this.vel.x < 0) {
+				return vec2(0,1);
+			} else {
+				return vec2(0,-1);
+			}
+		}
+	},
+	rotRight: function() {
+		return this.rotLeft().mul(-1);
+	},
+	step: function(field) {
+		var to_apply = this.getSide(field);
+		
+		var ret = [];
+		
+		if (to_apply == LaserT.Pass || to_apply == LaserT.PassLeft || to_apply == LaserT.PassRight) {
+			ret.push(new LaserPos(this.pos.add(this.vel),this.vel)); 
+		}
+		if (to_apply == LaserT.MirrorLeft || to_apply == LaserT.PassLeft) {
+			ret.push(new LaserPos(this.pos.add(this.rotLeft(this.vel)),this.rotLeft(this.vel))); 
+		}
+		if (to_apply == LaserT.MirrorRight || to_apply == LaserT.PassRight) {
+			ret.push(new LaserPos(this.pos.add(this.rotRight(this.vel)),this.rotRight(this.vel))); 
+		}
+		
+		return ret;
+	}
+}
+
+
 /* * * * * * * * * * FIELD TYPE * * * * * * * * * */
 var Field_size  = vec2(85,85);
 var Field_scale = 0.55;
 var FieldT = {
-	Laser      : {sprite_p: vec2(3,0)},
-	Mirror     : {sprite_p: vec2(2,0)},
-	Gate       : {sprite_p: vec2(1,0)},
-	Block      : {sprite_p: vec2(0,0)},
-	MirrorPass : {sprite_p: vec2(0,1)},
-	MirrorMono : {sprite_p: vec2(1,1)},
-	Forbidden  : {sprite_p: vec2(3,1)},
+	Laser      : {sprite_p: vec2(3,0), left: LaserT.Block,      top: LaserT.Block,      right: LaserT.Emit,       bottom: LaserT.Block      },
+	Mirror     : {sprite_p: vec2(2,0), left: LaserT.MirrorLeft, top: LaserT.MirrorRight,right: LaserT.MirrorLeft, bottom: LaserT.MirrorRight},
+	Gate       : {sprite_p: vec2(1,0), left: LaserT.Pass,       top: LaserT.Block,      right: LaserT.Pass,       bottom: LaserT.Block      },
+	Block      : {sprite_p: vec2(0,0), left: LaserT.Block,      top: LaserT.Block,      right: LaserT.Block,      bottom: LaserT.Block      },
+	MirrorPass : {sprite_p: vec2(0,1), left: LaserT.PassLeft,   top: LaserT.PassRight,  right: LaserT.PassLeft,   bottom: LaserT.PassRight  },
+	MirrorMono : {sprite_p: vec2(1,1), left: LaserT.Block,      top: LaserT.Block,      right: LaserT.MirrorLeft, bottom: LaserT.MirrorRight},
+	Forbidden  : {sprite_p: vec2(3,1), left: LaserT.Pass,       top: LaserT.Pass,       right: LaserT.Pass,       bottom: LaserT.Pass       },
 	getRandom: function() {
 		var r = Math.random()*100;
 		if (r < 16) return this.Laser     ; r -= 16;
@@ -266,10 +358,24 @@ var Drawer = {
 			the_drawer.fields.push(new Field(the_drawer.getPosFromIndex(n),i,0,0.95));
 		})})(this);
 	},
-	addItem: function(item) {
-		item.setPos(this.getPosFromIndex(this.fields.length));
+	addItem: function(p,item) {
+		var index = this.findIdFromPos(p);
+		
+		if (index == -1) {
+			index = this.fields.length;
+			this.fields.push(item);
+		}
+		else {
+			this.fields.splice(index,0,item);
+		}
+		item.setPos(this.getPosFromIndex(index));
 		item.setDrawScale(0.95);
-		this.fields.push(item);
+		
+		for (let i = index;i < this.fields.length;i++) {
+			if (i > index) {
+				this.fields[i].setPos(this.getPosFromIndex(i));
+			}
+		}
 	},
 	remItem: function(index) {
 		var ret = this.fields.splice(index,1)[0];
@@ -314,7 +420,7 @@ var Drawer = {
 	}
 };
 
-Drawer.loadItems([FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom()]);
+Drawer.loadItems([FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom()]);
 
 
 
@@ -496,7 +602,7 @@ var handleDragDrop = function(p) {
 		if (field == -1)
 		{
 			/*
-			Drawer.addItem(dragField);
+			Drawer.addItem(p,dragField);
 			dragField = null;
 			*/
 			dragField.setRot(dragField.rot + 360);
@@ -512,7 +618,7 @@ var handleDragDrop = function(p) {
 	}
 	else
 	{
-		Drawer.addItem(dragField);
+		Drawer.addItem(p,dragField);
 		dragField = null;
 	}
 };
@@ -527,6 +633,26 @@ render = function () {
 	if (isDraggingField()) {
 		dragField.draw();
 	}
+	
+	if (lasers.length != 0) {
+		for (l of lasers) {
+			
+			var p = Map.getPosFromIndex(l.pos);
+			var p1 = p.add(l.vel.mul(15));
+			var p2 = p.add(l.vel.mul(-5).add(l.vel.perp().mul( 5)));
+			var p3 = p.add(l.vel.mul(-5).add(l.vel.perp().mul(-5)));
+			
+			ctx.beginPath();
+			ctx.lineWidth = 2;
+			ctx.strokeStyle = "#FF0000";
+			ctx.moveTo(p1.x,p1.y);
+			ctx.lineTo(p2.x,p2.y);
+			ctx.lineTo(p3.x,p3.y);
+			ctx.closePath();
+			
+			ctx.stroke();
+		}
+	}
 };
 
 
@@ -537,12 +663,44 @@ var dragMode = 0;
 var dragBegP = vec2();
 var dragTime = new Date();
 
+var lasers = [];
+
 window.onkeydown = function(e) {
 	if (isDraggingField())
 	{
 		if (e.keyCode == 82) // r
 		{
 			dragField.setRot(dragField.rot + 90);
+		}
+	}
+	
+	if (e.keyCode == 65) 
+	{
+		if (lasers.length == 0) {
+			for (var x = 0;x < Map.fields.length;x++) {
+				for (var y = 0;y < Map.fields[x].length;y++) {
+					
+					if (Map.fields[x][y].field != null) {
+						if (Map.fields[x][y].field.type == FieldT.Laser) {
+							var l = new LaserPos(vec2(x,y),vec2(1,0));
+							l.vel = l.rotObjDegs(Map.fields[x][y].field.rot * -1);
+							l.pos = l.pos.add(l.vel);
+							lasers.push(l);
+						}
+					}
+				}
+			}
+		} else {
+			var tmp = [];
+			for (l of lasers) {
+				if (l.pos.x >= 0 && l.pos.y >= 0 && l.pos.x < Map.size.x && l.pos.y < Map.size.y) {
+					var field = Map.fields[l.pos.x][l.pos.y].field;
+					
+					tmp = tmp.concat(l.step(field));					
+				}
+			}
+			
+			lasers = tmp;
 		}
 	}
 };
@@ -554,7 +712,8 @@ window.onkeyup = function(e) {
 canvas.onmouseleave = function(e) {
 	if (isDraggingField())
 	{
-		Drawer.addItem(dragField);
+		var p = vec2(e.layerX - canvas.offsetLeft,e.layerY - canvas.offsetTop);
+		Drawer.addItem(p,dragField);
 		dragField = null;
 	}
 }
