@@ -212,7 +212,7 @@ Field.prototype = {
 /* * * * * * * * * * DRAWER CLASS * * * * * * * * * */
 var Drawer = {
 	fields: [],
-	width: 50, 
+	width: 100,
 	draw: function() {
 		this.fields.forEach(function(ff) {
 			ff.draw();
@@ -221,30 +221,57 @@ var Drawer = {
 	getPosFromIndex: function(n) {
 		var itemPerRow = Math.floor(this.width / (Field_size.x * Field_scale));
 		if (itemPerRow < 1) itemPerRow = 1;
-		var row = Math.floor(this.fields.length / itemPerRow);
-		var col = this.fields.length % itemPerRow;
+		var row = Math.floor(n / itemPerRow);
+		var col = n % itemPerRow;
 		
-		return vec2(col,row).mul(Field_size.x * Field_scale).add(vec2(canvas.width - this.width + Field_size.x * Field_scale / 2,Field_size.x * Field_scale / 2));
+		return vec2(col,row).mul(Field_size.mul(Field_scale)).add(vec2(canvas.width - this.width + Field_size.x * Field_scale / 2,Field_size.x * Field_scale / 2));
 	},
 	loadItems: function(items) {
 		(function(the_drawer) {
 		items.forEach(function(i,n) {
 			the_drawer.fields.push(new Field(the_drawer.getPosFromIndex(n),i));
 		})})(this);
+	},
+	addItem: function(item) {
+		item.setPos(this.getPosFromIndex(this.fields.length));
+		this.fields.push(item);
+	},
+	remItem: function(index) {
+		var ret = this.fields.splice(index,1)[0];
+		for (let i = index;i < this.fields.length;i++) {
+			this.fields[i].setPos(this.getPosFromIndex(i));
+		}
+		return ret;
+	},
+	handlePress: function(p) {
+		if (!isDraggingField())
+		{
+			var s = Field_size.mul(Field_scale);
+			for (i in this.fields) {
+				var midp = this.getPosFromIndex(i);
+				if (p.x > midp.x - s.x/2 && p.x < midp.x + s.x/2 && 
+					p.y > midp.y - s.y/2 && p.y < midp.y + s.y/2)
+				{
+					dragField = this.remItem(i);
+					break;
+				}
+			}
+		}
 	}
 };
 
-Drawer.loadItems([FieldT.Laser,FieldT.Laser,FieldT.Mirror]);
+Drawer.loadItems([FieldT.Laser,FieldT.Laser,FieldT.Mirror,FieldT.Laser,FieldT.Mirror,FieldT.Mirror,FieldT.Laser,FieldT.Mirror]);
 
 
 
 /* * * * * * * * * * GLOBAL VARIABLES * * * * * * * * * */
 var sprite_sheet = document.getElementById("sprite_sheet");
 
+var dragField = null;
 
-var f = new Field(vec2(50,50),FieldT.Laser,0);
-
-
+var isDraggingField = function() {
+	return dragField instanceof Field;
+};
 
 
 /* * * * * * * * * * RENDERING METHOD * * * * * * * * * */
@@ -253,37 +280,55 @@ render = function () {
 	ctx.clearRect(0,0,canvas.width,canvas.height);
 	
 	Drawer.draw();
-	
-	f.draw();
+	if (isDraggingField()) {
+		dragField.draw();
+	}
 };
 
 /* * * * * * * * * * LISTENERS * * * * * * * * * */
 
-window.onkeydown = function(e) 
-{
-	if (e.keyCode == 107) f.setRot(f.rot + 90);
+window.onkeydown = function(e) {
+	if (isDraggingField())
+	{
+		if (e.keyCode == 82) // r
+		{
+			dragField.setRot(dragField.rot + 90);
+		}
+	}
 };
-/*
-window.onkeyup = function(e) 
-{
-	if (e.keyCode == 38) down[0] = false;
-	if (e.keyCode == 40) down[1] = false;
-	if (e.keyCode == 39) down[2] = false;
-	if (e.keyCode == 37) down[3] = false;
-};*/
+
+window.onkeyup = function(e) {
+	
+};
 
 canvas.onmousedown = function(e) {
-	if (e.buttons == 1)
+	if (e.button == 2)
 	{
-		f.setPos(vec2(e.layerX - canvas.offsetLeft,e.layerY - canvas.offsetTop));
+		if (isDraggingField())
+		{
+			dragField.setRot(dragField.rot + 90);
+		}
 	}
-	if (e.buttons == 2)
+	if (e.button == 0)
 	{
-		f.setDrawScale(f.draw_scale + 1.0);
+		if (isDraggingField())
+		{
+			Drawer.addItem(dragField);
+			dragField = null;
+		}
+		else
+		{
+			Drawer.handlePress(vec2(e.layerX - canvas.offsetLeft,e.layerY - canvas.offsetTop));
+		}
 	}
 };
+
 canvas.onmousemove = function(e) {
-	// console.log(e);
+	if (isDraggingField())
+	{
+		var p = vec2(e.layerX - canvas.offsetLeft,e.layerY - canvas.offsetTop);
+		dragField.setPos(p);
+	}
 };
 
 
