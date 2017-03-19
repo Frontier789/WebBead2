@@ -171,7 +171,9 @@ var LaserT = {
 	MirrorRight: 3,
 	MirrorLeft:  4,
 	PassRight:   5,
-	PassLeft:    6
+	PassLeft:    6,
+	FreeGoal:    7,
+	Goal:        8
 };
 
 function LaserPos(p,v) {
