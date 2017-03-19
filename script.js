@@ -18,6 +18,9 @@ var animloop = function animloop() {
 	render();
 };
 
+canvas.oncontextmenu = function(e) {
+    e.preventDefault();
+};
 
 
 
@@ -138,7 +141,7 @@ Transition.prototype = {
 		
 		var dt = this.getTime() / this.dur;
 		
-		dt = 3*dt*dt - 2*dt*dt*dt;
+		dt = Math.sqrt(3*dt*dt - 2*dt*dt*dt);
 		
 		if (this.until instanceof vec2_t) {
 			return this.until.mul(dt).add(this.from.mul(1.0 - dt));
@@ -161,8 +164,11 @@ function Field(p, type, rot) {
 	this.pos  = p    || 0;
 	this.type = type || 0;
 	this.rot  = rot  || 0;
+	this.draw_scale = 1.0;
 	
 	this.pos_transition = new Transition(p,p,0);
+	this.rot_transition = new Transition(rot,rot,0);
+	this.scl_transition = new Transition(1.0,1.0,0);
 };
 
 Field.prototype = {
@@ -170,22 +176,31 @@ Field.prototype = {
 		this.pos_transition.set(this.pos,p,0.2);
 		this.pos = p;
 	},
+	setRot: function(r) {
+		this.rot_transition.set(this.rot,r,0.2);
+		this.rot = r;
+	},
+	setDrawScale: function(s) {
+		this.scl_transition.set(this.draw_scale,s,0.2);
+		this.draw_scale = s;
+	},
 	draw: function() {
 		
 		var pos = this.pos_transition.get();
-		var rot = this.rot;
+		var rot = this.rot_transition.get();
+		var draw_scale = this.scl_transition.get();
 		
 		ctx.translate(pos.x,pos.y);
 		ctx.rotate(rot / 180.0 * 3.141592);
-		ctx.translate(-Field_size.x * Field_scale/2,-Field_size.y * Field_scale/2);
+		ctx.translate(-Field_size.x * Field_scale/2 * draw_scale,-Field_size.y * Field_scale/2 * draw_scale);
 		
 		ctx.drawImage(sprite_sheet,
 					  this.type.sprite_p.x * Field_size.x,this.type.sprite_p.y * Field_size.y,
 					  Field_size.x,Field_size.y,
 					  0,0,
-					  Field_size.x * Field_scale,Field_size.y * Field_scale);
+					  Field_size.x * Field_scale * draw_scale,Field_size.y * Field_scale * draw_scale);
 					  
-		ctx.translate(Field_size.x * Field_scale/2,Field_size.y * Field_scale/2);
+		ctx.translate(Field_size.x * Field_scale/2 * draw_scale,Field_size.y * Field_scale/2 * draw_scale);
 		ctx.rotate(-rot / 180.0 * 3.141592);
 		ctx.translate(-pos.x,-pos.y);
 	}
@@ -194,11 +209,40 @@ Field.prototype = {
 
 
 
+/* * * * * * * * * * DRAWER CLASS * * * * * * * * * */
+var Drawer = {
+	fields: [],
+	width: 50, 
+	draw: function() {
+		this.fields.forEach(function(ff) {
+			ff.draw();
+		});
+	},
+	getPosFromIndex: function(n) {
+		var itemPerRow = Math.floor(this.width / (Field_size.x * Field_scale));
+		if (itemPerRow < 1) itemPerRow = 1;
+		var row = Math.floor(this.fields.length / itemPerRow);
+		var col = this.fields.length % itemPerRow;
+		
+		return vec2(col,row).mul(Field_size.x * Field_scale).add(vec2(canvas.width - this.width + Field_size.x * Field_scale / 2,Field_size.x * Field_scale / 2));
+	},
+	loadItems: function(items) {
+		(function(the_drawer) {
+		items.forEach(function(i,n) {
+			the_drawer.fields.push(new Field(the_drawer.getPosFromIndex(n),i));
+		})})(this);
+	}
+};
+
+Drawer.loadItems([FieldT.Laser,FieldT.Laser,FieldT.Mirror]);
+
+
+
 /* * * * * * * * * * GLOBAL VARIABLES * * * * * * * * * */
 var sprite_sheet = document.getElementById("sprite_sheet");
 
 
-var f = new Field(vec2(50,50),FieldT.Laser,10);
+var f = new Field(vec2(50,50),FieldT.Laser,0);
 
 
 
@@ -208,21 +252,18 @@ render = function () {
 	
 	ctx.clearRect(0,0,canvas.width,canvas.height);
 	
-	f.rot++;
+	Drawer.draw();
+	
 	f.draw();
-
 };
 
 /* * * * * * * * * * LISTENERS * * * * * * * * * */
-/*
+
 window.onkeydown = function(e) 
 {
-	if (e.keyCode == 38) down[0] = true;
-	if (e.keyCode == 40) down[1] = true;
-	if (e.keyCode == 39) down[2] = true;
-	if (e.keyCode == 37) down[3] = true;
+	if (e.keyCode == 107) f.setRot(f.rot + 90);
 };
-
+/*
 window.onkeyup = function(e) 
 {
 	if (e.keyCode == 38) down[0] = false;
@@ -235,6 +276,10 @@ canvas.onmousedown = function(e) {
 	if (e.buttons == 1)
 	{
 		f.setPos(vec2(e.layerX - canvas.offsetLeft,e.layerY - canvas.offsetTop));
+	}
+	if (e.buttons == 2)
+	{
+		f.setDrawScale(f.draw_scale + 1.0);
 	}
 };
 canvas.onmousemove = function(e) {
