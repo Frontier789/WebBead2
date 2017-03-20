@@ -1,0 +1,32 @@
+body {
+	text-align:center;
+}
+
+.map_btn {
+	height: 50px;
+	width: 50px;
+	padding: 0px;
+	border: 0px;
+	
+    background-color: #eeeeee;
+}
+
+.map_btn:hover {
+    background-color: #dfebfd;
+}
+
+.map_btn:active {
+    background-color: #e4e4e4;
+}
+
+.map_btn_text {
+	font-weight: bold;
+}
+
+.map_table {
+    background-color: lightblue;
+	margin-left:   auto; 
+	margin-right:  auto;
+	margin-top:    10%;
+	margin-bottom: 10%;
+}
