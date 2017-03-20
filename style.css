@@ -7,16 +7,17 @@ body {
 	width: 50px;
 	padding: 0px;
 	border: 0px;
+	margin: 10px;
 	
-    background-color: #eeeeee;
+    background: url(btn_bckg.png) no-repeat;
 }
 
 .map_btn:hover {
-    background-color: #dfebfd;
+    background: url(btn_bckg1.png) no-repeat;
 }
 
 .map_btn:active {
-    background-color: #e4e4e4;
+    background: url(btn_bckg.png) no-repeat;
 }
 
 .map_btn_text {
@@ -24,7 +25,6 @@ body {
 }
 
 .map_table {
-    background-color: lightblue;
 	margin-left:   auto; 
 	margin-right:  auto;
 	margin-top:    10%;

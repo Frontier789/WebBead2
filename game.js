@@ -22,6 +22,19 @@ canvas.oncontextmenu = function(e) {
     e.preventDefault();
 };
 
+var tmpGameData = document.getElementById("game_map").innerHTML.replace(/\s/g,'').split(";");
+var GameData = [];
+
+tmpGameData.forEach(function(r) {
+	var string_arr = r.split(",");
+	var int_arr = [];
+	for (s of string_arr) {
+		int_arr.push(parseInt(s));
+	}
+	GameData.push(int_arr);
+});
+
+
 
 
 /* * * * * * * * * * VECTOR MODULE * * * * * * * * * */
@@ -306,7 +319,7 @@ LaserPath.prototype = {
 		}
 	},
 	reverse: function() {
-		var tmparr = [this.cur_transition.get()];
+		var tmparr = [this.cur_transition.until];
 		
 		for (var i = this.arr.length - 1;i >= 0;i--) {
 			tmparr.push(this.arr[i]);
@@ -418,6 +431,18 @@ var FieldT = {
 	MirrorGoal : {sprite_p: vec2(2,1), left: LaserT.Goal,       top: LaserT.Block,      right: LaserT.MirrorLeft, bottom: LaserT.MirrorRight},
 	Goal       : {sprite_p: vec2(0,2), left: LaserT.Goal,       top: LaserT.Goal,       right: LaserT.Goal,       bottom: LaserT.Goal       },
 	Forbidden  : {sprite_p: vec2(3,1), left: LaserT.Pass,       top: LaserT.Pass,       right: LaserT.Pass,       bottom: LaserT.Pass       },
+	getFromId: function(id) {
+		if (id == 1) return this.Laser     ;
+		if (id == 2) return this.Mirror    ;
+		if (id == 3) return this.Gate      ;
+		if (id == 4) return this.Block     ;
+		if (id == 5) return this.MirrorPass;
+		if (id == 6) return this.MirrorMono;
+		if (id == 7) return this.MirrorGoal;
+		if (id == 8) return this.Goal      ;
+		if (id == 9) return this.Forbidden ;
+		return this.Forbidden;
+	},
 	getRandom: function() {
 		var r = Math.random()*100;
 		if (r < 12) return this.Laser     ; r -= 12;
@@ -578,7 +603,16 @@ var Drawer = {
 	}
 };
 
-Drawer.loadItems([FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom(),FieldT.getRandom()]);
+
+var DrawerItems = [];
+
+var item_offset = GameData[0][0] * GameData[0][1] + 2;
+
+for (var i of GameData[item_offset]) {
+	DrawerItems.push(FieldT.getFromId(i));
+}
+
+Drawer.loadItems(DrawerItems);
 
 
 
@@ -699,9 +733,21 @@ var Map = {
 	}
 };
 
-Map.resize(vec2(10,10));
-Map.fields[5][5].fixed = true;
-Map.forceSet(vec2(5,5),new Field(Map.getPosFromIndex(vec2(5,5)),FieldT.Forbidden));
+Map.resize(vec2(GameData[0][0],GameData[0][1]));
+
+for (var i = 0;i < GameData[0][0] * GameData[0][1];i++) {
+	var x = i % GameData[0][1];
+	var y = Math.floor(i / GameData[0][1]);
+	
+	if (GameData[i + 1][0] != 0) {
+		Map.forceSet(vec2(x,y),new Field(Map.getPosFromIndex(vec2(x,y)),FieldT.getFromId(GameData[i + 1][0])));
+		Map.fields[x][y].field.rot =  GameData[i + 1][1];
+		Map.fields[x][y].field.setRot(GameData[i + 1][1]);
+	}
+	
+	Map.fields[x][y].fixed     = (GameData[i + 1][2] == 1);
+	Map.fields[x][y].rotfix    = (GameData[i + 1][3] == 1);
+}
 
 
 
