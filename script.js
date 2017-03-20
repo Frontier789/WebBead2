@@ -140,18 +140,26 @@ Transition.prototype = {
 	getTime: function() {
 		return ((new Date()) - this.clock) / 1000;
 	},
-	set: function(a, b, t) {
+	set: function(a, b, t, r) {
 		this.from  = a;
 		this.until = b;
 		this.dur   = t;
 		this.clock = new Date();
+		this.reversed = r || false;
 	},
 	get: function() {
-		if (this.finished()) return this.until;
+		if (this.finished()) {
+			if (this.reversed)
+				return this.from;
+				
+			return this.until;
+		}
 		
 		var dt = this.getTime() / this.dur;
 		
 		dt = Math.sqrt(3*dt*dt - 2*dt*dt*dt);
+		
+		if (this.reversed) dt = 1 - dt;
 		
 		if (this.until instanceof vec2_t) {
 			return this.until.mul(dt).add(this.from.mul(1.0 - dt));
@@ -250,7 +258,151 @@ LaserPos.prototype = {
 		
 		return ret;
 	}
-}
+};
+
+
+
+
+/* * * * * * * * * * LASERDRAW CLASS * * * * * * * * * */
+function LaserPath(beg,lp) {
+	this.cur  = beg || vec2();
+	this.arr  = [];
+	this.lpos = lp || null;
+	this.cur_transition = new Transition(beg,beg,0);
+	this.reversed = false;
+};
+
+LaserPath.prototype = {
+	add: function(p) {
+		this.arr.push(this.cur);
+		this.cur_transition.set(this.cur,p,0.5);
+		this.cur = p;
+	},
+	step: function() {
+		if (this.lpos != null) {
+			if (!this.reversed) {
+				var next_lposes = this.lpos.step(Map.fields[this.lpos.pos.x][this.lpos.pos.y].field);
+			
+				var ret = [];
+				
+				for (p in next_lposes) {
+					ret.push(new LaserPath);
+					ret[p].cur = this.cur;
+					ret[p].arr = this.arr.slice();
+					ret[p].cur_transition.set(this.cur,this.cur,0);
+					ret[p].lpos = next_lposes[p];
+					ret[p].add(Map.getPosFromIndex(next_lposes[p].pos));
+				}
+				
+				return ret;
+			} else {
+				if (this.arr.length > 1) {
+					this.cur_transition.set(this.arr[this.arr.length - 2],this.arr[this.arr.length - 1],0.5,true);
+					this.arr.splice(this.arr.length - 1,1);
+					return [this];
+				}
+				return [];
+			}
+		}
+	},
+	reverse: function() {
+		var tmparr = [this.cur_transition.get()];
+		
+		for (var i = this.arr.length - 1;i >= 0;i--) {
+			tmparr.push(this.arr[i]);
+		}
+		
+		this.cur_transition.set(this.arr[0],this.arr[0],0);
+		this.arr = tmparr;
+		
+		this.reversed = true;
+	},
+	draw: function() {
+		if (this.arr.length > 0) {
+			
+			ctx.beginPath();
+			ctx.strokeStyle = "#FF0000";
+			ctx.lineWidth = 1;
+			
+			ctx.moveTo(this.arr[0].x,this.arr[0].y);
+			
+			for (p of this.arr) {
+				ctx.lineTo(p.x,p.y);
+			}
+			
+			var last = this.cur_transition.get(); 
+			ctx.lineTo(last.x,last.y);
+			
+			ctx.moveTo(this.arr[0].x,this.arr[0].y);
+			ctx.closePath();
+			
+			ctx.stroke();
+		}
+	}
+};
+
+var LaserDraw = {
+	paths: [],
+	finished_paths: [],
+	step: function() {
+		if (this.paths.length == 0 && this.finished_paths.length == 0) {
+			for (var x = 0;x < Map.fields.length;x++) {
+				for (var y = 0;y < Map.fields[x].length;y++) {
+					
+					if (Map.fields[x][y].field != null) {
+						if (Map.fields[x][y].field.type == FieldT.Laser) {
+							var l = new LaserPos(vec2(x,y),vec2(1,0));
+							var begp = l.pos;
+							l.vel = l.rotObjDegs(Map.fields[x][y].field.rot * -1);
+							l.pos = l.pos.add(l.vel);
+							this.paths.push(new LaserPath(Map.getPosFromIndex(begp),l));
+							this.paths[this.paths.length-1].add(Map.getPosFromIndex(l.pos));
+						}
+					}
+				}
+			}
+		} else {
+			var tmp = [];
+			for (l of this.paths) {
+				if (l.lpos.pos.x >= 0 && l.lpos.pos.y >= 0 && l.lpos.pos.x < Map.size.x && l.lpos.pos.y < Map.size.y) {
+					
+					var nexts = l.step();
+					
+					if (nexts.length == 0) {
+						l.reverse();
+						this.finished_paths.push(l);
+					} else {
+						tmp = tmp.concat(nexts);	
+					}
+				} else {
+					l.reverse();
+					this.finished_paths.push(l);
+				}
+			}
+			
+			this.paths = tmp;
+			
+			tmp = [];
+			
+			for (l of this.finished_paths) {
+				tmp = tmp.concat(l.step());
+			}
+			
+			this.finished_paths = tmp;
+		}
+	},
+	draw: function() {
+		for (l of this.paths) {
+			l.draw();
+		}
+		for (l of this.finished_paths) {
+			l.draw();
+		}
+	}
+};
+
+
+
 
 
 /* * * * * * * * * * FIELD TYPE * * * * * * * * * */
@@ -639,26 +791,7 @@ render = function () {
 	if (isDraggingField()) {
 		dragField.draw();
 	}
-	
-	if (lasers.length != 0) {
-		for (l of lasers) {
-			
-			var p = Map.getPosFromIndex(l.pos);
-			var p1 = p.add(l.vel.mul(15));
-			var p2 = p.add(l.vel.mul(-5).add(l.vel.perp().mul( 5)));
-			var p3 = p.add(l.vel.mul(-5).add(l.vel.perp().mul(-5)));
-			
-			ctx.beginPath();
-			ctx.lineWidth = 2;
-			ctx.strokeStyle = "#FF0000";
-			ctx.moveTo(p1.x,p1.y);
-			ctx.lineTo(p2.x,p2.y);
-			ctx.lineTo(p3.x,p3.y);
-			ctx.closePath();
-			
-			ctx.stroke();
-		}
-	}
+	LaserDraw.draw();
 };
 
 
@@ -669,7 +802,7 @@ var dragMode = 0;
 var dragBegP = vec2();
 var dragTime = new Date();
 
-var lasers = [];
+var lastMouseP;
 
 window.onkeydown = function(e) {
 	if (isDraggingField())
@@ -682,31 +815,21 @@ window.onkeydown = function(e) {
 	
 	if (e.keyCode == 65) 
 	{
-		if (lasers.length == 0) {
-			for (var x = 0;x < Map.fields.length;x++) {
-				for (var y = 0;y < Map.fields[x].length;y++) {
-					
-					if (Map.fields[x][y].field != null) {
-						if (Map.fields[x][y].field.type == FieldT.Laser) {
-							var l = new LaserPos(vec2(x,y),vec2(1,0));
-							l.vel = l.rotObjDegs(Map.fields[x][y].field.rot * -1);
-							l.pos = l.pos.add(l.vel);
-							lasers.push(l);
-						}
-					}
-				}
-			}
+		LaserDraw.step();
+	}
+	
+	if ((e.keyCode >= 48 && e.keyCode <= 57) || 
+		(e.keyCode >= 96 && e.keyCode <= 105))
+	{
+		var n = e.keyCode - 48;
+		if (n > 9) n += 48 - 96;
+		
+		if (!isDraggingField()) {
+			dragMode = 2;
+			Drawer.handlePress(Drawer.getPosFromIndex(n));
+			dragField.setPos(lastMouseP);
 		} else {
-			var tmp = [];
-			for (l of lasers) {
-				if (l.pos.x >= 0 && l.pos.y >= 0 && l.pos.x < Map.size.x && l.pos.y < Map.size.y) {
-					var field = Map.fields[l.pos.x][l.pos.y].field;
-					
-					tmp = tmp.concat(l.step(field));					
-				}
-			}
-			
-			lasers = tmp;
+			handleDragDrop(Drawer.getPosFromIndex(n).add(vec2(canvas.width,0)));
 		}
 	}
 };
@@ -785,9 +908,11 @@ canvas.onmouseup = function(e) {
 };
 
 canvas.onmousemove = function(e) {
+	var p = vec2(e.layerX - canvas.offsetLeft,e.layerY - canvas.offsetTop);
+	lastMouseP = p;
+	
 	if (isDraggingField())
 	{
-		var p = vec2(e.layerX - canvas.offsetLeft,e.layerY - canvas.offsetTop);
 		dragField.setPos(p);
 		
 		if (dragMode == 0)
