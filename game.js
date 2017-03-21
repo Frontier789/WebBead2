@@ -139,14 +139,17 @@ vec2_t.prototype = {
 
 
 /* * * * * * * * * * TRANSITION CLASS * * * * * * * * * */
-function Transition(a, b, t) {
+function Transition(a, b, t, int) {
 	this.from  = a || 0;
 	this.until = b || 0;
 	this.dur   = t || 1;
 	this.clock = new Date();
+	this.int   = int || 0;
 };
 
 Transition.prototype = {
+	Linear: 0,
+	Smooth: 1,
 	finished: function() {
 		return this.getTime() > this.dur;
 	},
@@ -170,7 +173,9 @@ Transition.prototype = {
 		
 		var dt = this.getTime() / this.dur;
 		
-		dt = Math.sqrt(3*dt*dt - 2*dt*dt*dt);
+		if (this.int == 1) {
+			dt = Math.sqrt(3*dt*dt - 2*dt*dt*dt);
+		}
 		
 		if (this.reversed) dt = 1 - dt;
 		
@@ -268,6 +273,14 @@ LaserPos.prototype = {
 		if (to_apply == LaserT.MirrorRight || to_apply == LaserT.PassRight) {
 			ret.push(new LaserPos(this.pos.add(this.rotRight(this.vel)),this.rotRight(this.vel))); 
 		}
+		if (to_apply == LaserT.Goal) {
+			console.log("wow, hit a goal");
+			num_targets--;
+		}
+		if (to_apply == LaserT.FreeGoal) {
+			console.log("wow, hit an optional goal");
+			num_targets--;
+		}
 		
 		return ret;
 	}
@@ -288,8 +301,11 @@ function LaserPath(beg,lp) {
 LaserPath.prototype = {
 	add: function(p) {
 		this.arr.push(this.cur);
-		this.cur_transition.set(this.cur,p,0.5);
+		this.cur_transition.set(this.cur,p,0.1,false,Transition.Linear);
 		this.cur = p;
+	},
+	finished: function() {
+		return this.cur_transition.finished();
 	},
 	step: function() {
 		if (this.lpos != null) {
@@ -310,7 +326,7 @@ LaserPath.prototype = {
 				return ret;
 			} else {
 				if (this.arr.length > 1) {
-					this.cur_transition.set(this.arr[this.arr.length - 2],this.arr[this.arr.length - 1],0.5,true);
+					this.cur_transition.set(this.arr[this.arr.length - 2],this.arr[this.arr.length - 1],0.1,true,Transition.Linear);
 					this.arr.splice(this.arr.length - 1,1);
 					return [this];
 				}
@@ -333,6 +349,9 @@ LaserPath.prototype = {
 	draw: function() {
 		if (this.arr.length > 0) {
 			
+			ctx.shadowBlur = 10;
+			ctx.shadowColor = "#990000";
+			
 			ctx.beginPath();
 			ctx.strokeStyle = "#FF0000";
 			ctx.lineWidth = 1;
@@ -350,6 +369,8 @@ LaserPath.prototype = {
 			ctx.closePath();
 			
 			ctx.stroke();
+			
+			ctx.shadowBlur = 0;
 		}
 	}
 };
@@ -357,8 +378,27 @@ LaserPath.prototype = {
 var LaserDraw = {
 	paths: [],
 	finished_paths: [],
+	reset: function() {
+		paths = [];
+		finished_paths = [];
+	},
+	started: function() {
+		return this.paths.length != 0 || this.finished_paths.length != 0;
+	},
+	finished: function() {
+		if (this.paths.length == 0 && 
+			this.finished_paths.length == 0) {
+			return true;
+		}
+		
+		if (this.paths.length == 0) {
+			return this.finished_paths[0].finished();
+		}
+		
+		return this.paths[0].finished();
+	},
 	step: function() {
-		if (this.paths.length == 0 && this.finished_paths.length == 0) {
+		if (!this.started()) {
 			for (var x = 0;x < Map.fields.length;x++) {
 				for (var y = 0;y < Map.fields[x].length;y++) {
 					
@@ -486,6 +526,13 @@ Field.prototype = {
 		var rot = this.rot_transition.get();
 		var draw_scale = this.scl_transition.get();
 		
+		if (draw_scale > 0.95) {
+			ctx.shadowBlur    = (draw_scale - 0.95) *  50;
+			ctx.shadowOffsetX = (draw_scale - 0.95) *  40;
+			ctx.shadowOffsetY = (draw_scale - 0.95) * -20;
+			ctx.shadowColor = "#999999";
+		}
+		
 		ctx.translate(pos.x,pos.y);
 		ctx.rotate(rot / 180.0 * 3.141592);
 		ctx.translate(-Field_size.x * Field_scale/2 * draw_scale,-Field_size.y * Field_scale/2 * draw_scale);
@@ -499,6 +546,10 @@ Field.prototype = {
 		ctx.translate(Field_size.x * Field_scale/2 * draw_scale,Field_size.y * Field_scale/2 * draw_scale);
 		ctx.rotate(-rot / 180.0 * 3.141592);
 		ctx.translate(-pos.x,-pos.y);
+		
+		ctx.shadowBlur = 0;
+		ctx.shadowOffsetX = 0;
+		ctx.shadowOffsetY = 0;
 	}
 };
 
@@ -735,9 +786,11 @@ var Map = {
 
 Map.resize(vec2(GameData[0][0],GameData[0][1]));
 
+Map.offset = vec2(canvas.width,canvas.height).sub(Map.size.mul(Field_size.mul(Field_scale))).div(2);
+
 for (var i = 0;i < GameData[0][0] * GameData[0][1];i++) {
-	var x = i % GameData[0][1];
-	var y = Math.floor(i / GameData[0][1]);
+	var x = i % GameData[0][0];
+	var y = Math.floor(i / GameData[0][0]);
 	
 	if (GameData[i + 1][0] != 0) {
 		Map.forceSet(vec2(x,y),new Field(Map.getPosFromIndex(vec2(x,y)),FieldT.getFromId(GameData[i + 1][0])));
@@ -827,6 +880,9 @@ var handleDragDrop = function(p) {
 	}
 };
 
+var num_targets = 1;
+var playing = 0;
+
 /* * * * * * * * * * RENDERING METHOD * * * * * * * * * */
 render = function () {
 	
@@ -838,9 +894,33 @@ render = function () {
 		dragField.draw();
 	}
 	LaserDraw.draw();
+	
+	ctx.font="30px Verdana";
+	ctx.fillText("Célpontok száma: " + num_targets,0,canvas.height - 21);
+	
+	if (playing == 1) {
+		try_play(false);
+	}
 };
 
 
+
+var try_play = function(start) {
+	
+	if (start) {
+		LaserDraw.reset();
+		
+		LaserDraw.step();
+	} else {
+		if (LaserDraw.finished()) {
+			if (!LaserDraw.started()) {
+				playing = 0;
+			} else {
+				LaserDraw.step();
+			}
+		}
+	}
+};
 
 
 /* * * * * * * * * * LISTENERS * * * * * * * * * */
@@ -862,6 +942,12 @@ window.onkeydown = function(e) {
 	if (e.keyCode == 65) 
 	{
 		LaserDraw.step();
+	}
+	
+	if (e.keyCode == 66) 
+	{
+		playing = 1;
+		try_play(true);
 	}
 	
 	if ((e.keyCode >= 48 && e.keyCode <= 57) || 
