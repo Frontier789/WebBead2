@@ -2,22 +2,54 @@ body {
 	text-align:center;
 }
 
-.map_btn {
+.map_btn_red {
 	height: 50px;
 	width: 50px;
 	padding: 0px;
 	border: 0px;
 	margin: 10px;
 	
-    background: url(btn_bckg.png) no-repeat;
+    background: url(btns/btn_bckg_red.png) no-repeat;
 }
 
-.map_btn:hover {
-    background: url(btn_bckg1.png) no-repeat;
+.map_btn_red:hover {
+    background: url(btns/btn_bckg_red_small.png) no-repeat;
 }
 
-.map_btn:active {
-    background: url(btn_bckg.png) no-repeat;
+.map_btn_avail {
+	height: 50px;
+	width: 50px;
+	padding: 0px;
+	border: 0px;
+	margin: 10px;
+	
+    background: url(btns/btn_bckg_white.png) no-repeat;
+}
+
+.map_btn_avail:hover {
+    background: url(btns/btn_bckg_blue.png) no-repeat;
+}
+
+.map_btn_avail:active {
+    background: url(btns/btn_bckg_white.png) no-repeat;
+}
+
+.map_btn_done {
+	height: 50px;
+	width: 50px;
+	padding: 0px;
+	border: 0px;
+	margin: 10px;
+	
+    background: url(btns/btn_bckg_green.png) no-repeat;
+}
+
+.map_btn_done:hover {
+    background: url(btns/btn_bckg_blue.png) no-repeat;
+}
+
+.map_btn_done:active {
+    background: url(btns/btn_bckg_green.png) no-repeat;
 }
 
 .map_btn_text {

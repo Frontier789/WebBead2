@@ -273,12 +273,16 @@ LaserPos.prototype = {
 		if (to_apply == LaserT.MirrorRight || to_apply == LaserT.PassRight) {
 			ret.push(new LaserPos(this.pos.add(this.rotRight(this.vel)),this.rotRight(this.vel))); 
 		}
-		if (to_apply == LaserT.Goal) {
-			console.log("wow, hit a goal");
+		if (field != null && field.type == FieldT.Gate && !field.washit) {
+			console.log("passed gate");
+			field.washit = true;
+		}
+		if (to_apply == LaserT.Goal && !field.washit) {
+			field.washit = true;
 			num_targets--;
 		}
-		if (to_apply == LaserT.FreeGoal) {
-			console.log("wow, hit an optional goal");
+		if (to_apply == LaserT.FreeGoal && !field.washit) {
+			field.washit = true;
 			num_targets--;
 		}
 		
@@ -317,7 +321,14 @@ LaserPath.prototype = {
 				for (p in next_lposes) {
 					ret.push(new LaserPath);
 					ret[p].cur = this.cur;
-					ret[p].arr = this.arr.slice();
+					if (p == 0) {
+						ret[p].arr = this.arr.slice();
+					} else {
+						ret[p].arr = [];
+						while (ret[p].arr.length < this.arr.length) {
+							ret[p].arr.push(this.cur);
+						}
+					}
 					ret[p].cur_transition.set(this.cur,this.cur,0);
 					ret[p].lpos = next_lposes[p];
 					ret[p].add(Map.getPosFromIndex(next_lposes[p].pos));
@@ -349,11 +360,11 @@ LaserPath.prototype = {
 	draw: function() {
 		if (this.arr.length > 0) {
 			
-			ctx.shadowBlur = 10;
-			ctx.shadowColor = "#990000";
+			ctx.shadowBlur = 2;
+			ctx.shadowColor = "#ff0000";
 			
 			ctx.beginPath();
-			ctx.strokeStyle = "#FF0000";
+			ctx.strokeStyle = "#ff9ab2";
 			ctx.lineWidth = 1;
 			
 			ctx.moveTo(this.arr[0].x,this.arr[0].y);
@@ -435,13 +446,15 @@ var LaserDraw = {
 			
 			this.paths = tmp;
 			
-			tmp = [];
-			
-			for (l of this.finished_paths) {
-				tmp = tmp.concat(l.step());
+			if (this.paths.length == 0) {
+				tmp = [];
+				
+				for (l of this.finished_paths) {
+					tmp = tmp.concat(l.step());
+				}
+				
+				this.finished_paths = tmp;
 			}
-			
-			this.finished_paths = tmp;
 		}
 	},
 	draw: function() {
@@ -460,7 +473,7 @@ var LaserDraw = {
 
 /* * * * * * * * * * FIELD TYPE * * * * * * * * * */
 var Field_size  = vec2(85,85);
-var Field_scale = 0.55;
+var Field_scale = 0.65;
 var FieldT = {
 	Laser      : {sprite_p: vec2(3,0), left: LaserT.Block,      top: LaserT.Block,      right: LaserT.Emit,       bottom: LaserT.Block      },
 	Mirror     : {sprite_p: vec2(2,0), left: LaserT.MirrorLeft, top: LaserT.MirrorRight,right: LaserT.MirrorLeft, bottom: LaserT.MirrorRight},
@@ -501,6 +514,7 @@ function Field(p, type, rot, scl) {
 	this.type = type || 0;
 	this.rot  = rot  || 0;
 	this.draw_scale = scl || 1.0;
+	this.washit = false;
 	
 	this.pos_transition = new Transition(p,p,0);
 	this.rot_transition = new Transition(rot,rot,0);
@@ -538,8 +552,8 @@ Field.prototype = {
 		ctx.translate(-Field_size.x * Field_scale/2 * draw_scale,-Field_size.y * Field_scale/2 * draw_scale);
 		
 		ctx.drawImage(sprite_sheet,
-					  this.type.sprite_p.x * Field_size.x,this.type.sprite_p.y * Field_size.y,
-					  Field_size.x,Field_size.y,
+					  this.type.sprite_p.x * Field_size.x + 0.5,this.type.sprite_p.y * Field_size.y + 0.5,
+					  Field_size.x - 1,Field_size.y - 1,
 					  0,0,
 					  Field_size.x * Field_scale * draw_scale,Field_size.y * Field_scale * draw_scale);
 					  
@@ -553,13 +567,10 @@ Field.prototype = {
 	}
 };
 
-
-
-
 /* * * * * * * * * * DRAWER CLASS * * * * * * * * * */
 var Drawer = {
 	fields: [],
-	width: 100,
+	width: Field_size.x * Field_scale * 2 + 6,
 	offsety: 5,
 	getItemPerRow: function() {
 		var itemPerRow = Math.floor(this.width / (Field_size.x * Field_scale));
@@ -657,10 +668,21 @@ var Drawer = {
 
 var DrawerItems = [];
 
-var item_offset = GameData[0][0] * GameData[0][1] + 2;
+var item_offset = 1;
+var items_count = 0;
 
-for (var i of GameData[item_offset]) {
-	DrawerItems.push(FieldT.getFromId(i));
+while (items_count < GameData[0][0] * GameData[0][1]) {
+	if (GameData[item_offset].length == 5) {
+		items_count += GameData[item_offset][4];
+	} else {
+		items_count++;
+	}
+	
+	item_offset++;
+}
+
+for (var i = 0;i < GameData[item_offset];i++) {
+	DrawerItems.push(FieldT.getFromId(GameData[item_offset + 1][i]));
 }
 
 Drawer.loadItems(DrawerItems);
@@ -701,10 +723,19 @@ var Map = {
 				 this.offset,
 				 ["#cfcfcf","#000000"],[1.5,0.1]);
 		
-		for (x of this.fields) {
-			for (y of x) {
-				if (y.field != null) {
-					y.field.draw();
+		for (x in this.fields) {
+			for (y in this.fields[x]) {
+				var f = this.fields[x][y];
+				if (f.field != null) {
+					f.field.draw();
+				}
+				if (f.fixed) {
+					var p = this.getPosFromIndex(vec2(x,y)).add(Field_size.mul(Field_scale).mul(vec2(-1,-1)).div(2));
+					if (f.rotfix) {
+						ctx.drawImage(lock_rot_img,p.x + 3,p.y + 3);
+					} else {
+						ctx.drawImage(lock_img,p.x + 3,p.y + 3);
+					}
 				}
 			}
 		}
@@ -786,26 +817,135 @@ var Map = {
 
 Map.resize(vec2(GameData[0][0],GameData[0][1]));
 
-Map.offset = vec2(canvas.width,canvas.height).sub(Map.size.mul(Field_size.mul(Field_scale))).div(2);
+Map.offset = vec2(canvas.width,canvas.height).sub(Map.size.mul(Field_size.mul(Field_scale))).div(2).sub(vec2(0,Field_size.mul(Field_scale).y / 2 + 3));
+
+var MapFieldOffset = 1;
 
 for (var i = 0;i < GameData[0][0] * GameData[0][1];i++) {
 	var x = i % GameData[0][0];
 	var y = Math.floor(i / GameData[0][0]);
 	
-	if (GameData[i + 1][0] != 0) {
-		Map.forceSet(vec2(x,y),new Field(Map.getPosFromIndex(vec2(x,y)),FieldT.getFromId(GameData[i + 1][0])));
-		Map.fields[x][y].field.rot =  GameData[i + 1][1];
-		Map.fields[x][y].field.setRot(GameData[i + 1][1]);
+	if (GameData[MapFieldOffset][0] != 0) {
+		Map.forceSet(vec2(x,y),new Field(Map.getPosFromIndex(vec2(x,y)),FieldT.getFromId(GameData[MapFieldOffset][0])));
+		Map.fields[x][y].field.rot =  GameData[MapFieldOffset][1];
+		Map.fields[x][y].field.setRot(GameData[MapFieldOffset][1]);
 	}
 	
-	Map.fields[x][y].fixed     = (GameData[i + 1][2] == 1);
-	Map.fields[x][y].rotfix    = (GameData[i + 1][3] == 1);
+	Map.fields[x][y].fixed     = (GameData[MapFieldOffset][2] == 1);
+	Map.fields[x][y].rotfix    = (GameData[MapFieldOffset][3] == 1);
+	
+	if (GameData[MapFieldOffset].length == 4) {
+		MapFieldOffset++;
+	} else {
+		if (GameData[MapFieldOffset][4] > 1) {
+			GameData[MapFieldOffset][4]--;
+		} else {
+			MapFieldOffset++;
+		}
+	}
 }
 
 
 
+/* * * * * * * * * * PLAY BUTTON * * * * * * * * * */
+var PlayButton = {
+	offset: vec2(),
+	mouse_on: false,
+	clicked: false,
+	red_transition: new Transition(0,0,0),
+	gre_transition: new Transition(0,0,0),
+	blu_transition: new Transition(0,0,0),
+	siz_transition: new Transition(20,20,0),
+	wid_transition: new Transition(1,1,0),
+	draw: function() {
+		
+		var size  = this.siz_transition.get();
+		var red   = this.red_transition.get();
+		var green = this.gre_transition.get();
+		var blue  = this.blu_transition.get();
+		var width = this.wid_transition.get();
+		
+		ctx.beginPath();
+		ctx.lineWidth = width;
+		ctx.strokeStyle = "rgb("+red+","+green+","+blue+")";
+		ctx.moveTo(this.offset.x + size,this.offset.y);
+		ctx.lineTo(this.offset.x - size/2,this.offset.y + size/2);
+		ctx.lineTo(this.offset.x - size/2,this.offset.y - size/2);
+		ctx.lineTo(this.offset.x + size,this.offset.y);
+		ctx.closePath();
+		
+		ctx.stroke();
+	},
+	normalState: [20,0,100,0,1],
+	hoverState:  [23,100,200,100,3],
+	clickState:  [21,50,150,50,2],
+	applyState: function(from_state,to_state) {
+		var t = 0.1;
+		this.siz_transition.set(from_state[0],to_state[0],t);
+		this.red_transition.set(from_state[1],to_state[1],t);
+		this.gre_transition.set(from_state[2],to_state[2],t);
+		this.blu_transition.set(from_state[3],to_state[3],t);
+		this.wid_transition.set(from_state[4],to_state[4],t);
+	},
+	updateState: function(hover_dif,click_dif) {
+		if (click_dif) {
+			if (this.mouse_on) {
+				if (this.clicked) {
+					this.applyState(this.hoverState,this.clickState);
+				} else {
+					this.applyState(this.clickState,this.hoverState);
+				}
+			} else {
+				this.applyState(this.clickState,this.normalState);
+			}
+		} else {
+			if (hover_dif) {
+				if (this.clicked) {
+					///
+				} else {
+					if (this.mouse_on) {
+						this.applyState(this.normalState,this.hoverState);
+					} else {
+						this.applyState(this.hoverState,this.normalState);
+					}
+				}
+			}
+		}
+	},
+	handleHover: function(p) {
+		var mouse = (p.sub(this.offset).length() < this.siz_transition.get());
+		
+		if (mouse && !this.mouse_on) {
+			this.mouse_on = true;
+			this.updateState(true,false);
+		} else if (!mouse && this.mouse_on) {
+			this.mouse_on = false;
+			this.updateState(true,false);
+		}
+	},
+	handlePress: function(p) {
+		if (this.mouse_on && !this.clicked) {
+			this.clicked = true;
+			this.updateState(false,true);
+			playing = 1;
+			try_play(true);
+		}
+	},
+	handleRelease: function(p) {
+		if (this.clicked) {
+			this.clicked = false;
+			this.updateState(false,true);
+		}
+	}
+};
+
+PlayButton.offset = vec2(canvas.width,canvas.height).div(vec2(2,2)).add(Map.size.mul(Field_size.mul(Field_scale)).mul(vec2(0,0.5))).add(vec2(0,Field_size.mul(Field_scale).y / 2 + 3))
+
+
 /* * * * * * * * * * GLOBAL VARIABLES * * * * * * * * * */
 var sprite_sheet = document.getElementById("sprite_sheet");
+var lock_rot_img = document.getElementById("lock_rot_img");
+var lock_img     = document.getElementById("lock_img");
 
 var dragField = null;
 
@@ -880,7 +1020,8 @@ var handleDragDrop = function(p) {
 	}
 };
 
-var num_targets = 1;
+var target_needed = GameData[0][2];
+var num_targets = target_needed;
 var playing = 0;
 
 /* * * * * * * * * * RENDERING METHOD * * * * * * * * * */
@@ -894,6 +1035,7 @@ render = function () {
 		dragField.draw();
 	}
 	LaserDraw.draw();
+	PlayButton.draw();
 	
 	ctx.font="30px Verdana";
 	ctx.fillText("Célpontok száma: " + num_targets,0,canvas.height - 21);
@@ -911,10 +1053,26 @@ var try_play = function(start) {
 		LaserDraw.reset();
 		
 		LaserDraw.step();
+		
+		for (x of Map.fields) {
+			for (y of x) {
+				if (y.field != null) {
+					y.field.washit = false;
+				}				
+			}
+		}
 	} else {
 		if (LaserDraw.finished()) {
 			if (!LaserDraw.started()) {
 				playing = 0;
+				
+				if (num_targets == 0) {
+					map_done();
+					gen_table();
+				} else {
+					num_targets = target_needed;
+				}
+				
 			} else {
 				LaserDraw.step();
 			}
@@ -948,6 +1106,13 @@ window.onkeydown = function(e) {
 	{
 		playing = 1;
 		try_play(true);
+	}
+	
+	if (e.keyCode == 67) 
+	{
+		localStorage.clear();
+		map_states = [];
+		gen_table();
 	}
 	
 	if ((e.keyCode >= 48 && e.keyCode <= 57) || 
@@ -1002,6 +1167,7 @@ canvas.onmousedown = function(e) {
 		}
 		else
 		{
+			PlayButton.handlePress(p);
 			Drawer.handlePress(p);
 			Map.handlePress(p);
 			dragMode  = 0;
@@ -1015,6 +1181,9 @@ canvas.onmouseup = function(e) {
 	if (e.button == 0)
 	{
 		var p = vec2(e.layerX - canvas.offsetLeft,e.layerY - canvas.offsetTop);
+		
+		PlayButton.handleRelease(p);
+		
 		if (isDraggingField())
 		{
 			if (dragMode == 1)
@@ -1042,6 +1211,8 @@ canvas.onmouseup = function(e) {
 canvas.onmousemove = function(e) {
 	var p = vec2(e.layerX - canvas.offsetLeft,e.layerY - canvas.offsetTop);
 	lastMouseP = p;
+	
+	PlayButton.handleHover(p);
 	
 	if (isDraggingField())
 	{
