@@ -588,10 +588,19 @@ var Drawer = {
 				 vec2(canvas.width - this.width,this.offsety),
 				 ["#cfcfcf","#000000"],[1.5,0.1]);
 		
+		var to_draw = [];
+		
 		this.fields.forEach(function(ff) {
-			ff.draw();
+			to_draw.push(ff);
 		});
 		
+		to_draw.sort(function(a, b) {
+			return a.scl_transition.get() - b.scl_transition.get();
+		});
+		
+		for (f of to_draw) {
+			f.draw();
+		}
 	},
 	getPosFromIndex: function(n) {
 		var itemPerRow = this.getItemPerRow();
@@ -729,21 +738,50 @@ var Map = {
 				 this.offset,
 				 ["#cfcfcf","#000000"],[1.5,0.1]);
 		
+		var to_draw = [];
+		
 		for (x in this.fields) {
 			for (y in this.fields[x]) {
 				var f = this.fields[x][y];
 				if (f.field != null) {
-					f.field.draw();
+					to_draw.push(f.field);
 				}
-				if (f.fixed) {
-					var p = this.getPosFromIndex(vec2(x,y)).add(Field_size.mul(Field_scale).mul(vec2(-1,-1)).div(2));
-					if (f.rotfix) {
-						ctx.drawImage(lock_rot_img,p.x + 3,p.y + 3);
-					} else {
-						ctx.drawImage(lock_img,p.x + 3,p.y + 3);
+			}
+		}
+		
+		var draw_locks = function(map) {
+			for (x in map.fields) {
+				for (y in map.fields[x]) {
+					var f = map.fields[x][y];
+					if (f.fixed) {
+						var p = map.getPosFromIndex(vec2(x,y)).add(Field_size.mul(Field_scale).mul(vec2(-1,-1)).div(2));
+						if (f.rotfix) {
+							ctx.drawImage(lock_rot_img,p.x + 3,p.y + 3);
+						} else {
+							ctx.drawImage(lock_img,p.x + 3,p.y + 3);
+						}
 					}
 				}
 			}
+		};
+		
+		var locks_drawn = false;
+		
+		to_draw.sort(function(a, b) {
+			return a.scl_transition.get() - b.scl_transition.get();
+		});
+		
+		for (d of to_draw) {
+			if (d.scl_transition.get() > to_draw[0].scl_transition.get()+0.01 && !locks_drawn) {
+				locks_drawn = true;
+				draw_locks(this);
+			}
+			d.draw();
+		}
+		
+		if (!locks_drawn) {
+			locks_drawn = true;
+			draw_locks(this);
 		}
 	},
 	set: function(p,item) {
@@ -837,12 +875,10 @@ for (var i = 0;i < GameData[0][0] * GameData[0][1];i++) {
 	var y = Math.floor(i / GameData[0][0]);
 	
 	if (GameData[MapFieldOffset][0] != 0) {
-		var field = new Field(Map.getPosFromIndex(vec2(x,y)),FieldT.getFromId(GameData[MapFieldOffset][0]));
+		var field = new Field(Map.getPosFromIndex(vec2(x,y)),FieldT.getFromId(GameData[MapFieldOffset][0]),GameData[MapFieldOffset][1]);
 		field.init_map_place = vec2(x,y);
 		
 		Map.forceSet(vec2(x,y),field);
-		Map.fields[x][y].field.rot =  GameData[MapFieldOffset][1];
-		Map.fields[x][y].field.setRot(GameData[MapFieldOffset][1]);
 	}
 	
 	Map.fields[x][y].fixed     = (GameData[MapFieldOffset][2] == 1);
@@ -869,11 +905,12 @@ function PlayButtonTemplate(s1,s2,s3) {
 	this.normalState = s1 || [20,0,100,0,1];
 	this.hoverState  = s2 || [23,100,200,100,3];
 	this.clickState  = s3 || [21,50,150,50,2];
-	this.red_transition =  new Transition(this.normalState[1],this.normalState[1],0);
-	this.gre_transition =  new Transition(this.normalState[2],this.normalState[2],0);
-	this.blu_transition =  new Transition(this.normalState[3],this.normalState[3],0);
-	this.siz_transition =  new Transition(20,20,0);
-	this.wid_transition =  new Transition(1,1,0);
+	this.red_transition = new Transition(this.normalState[1],this.normalState[1],0);
+	this.gre_transition = new Transition(this.normalState[2],this.normalState[2],0);
+	this.blu_transition = new Transition(this.normalState[3],this.normalState[3],0);
+	this.siz_transition = new Transition(20,20,0);
+	this.wid_transition = new Transition(1,1,0);
+	this.blur_amount    = 2;
 	
 	this.draw = function() {
 		var size  = this.siz_transition.get();
@@ -882,7 +919,7 @@ function PlayButtonTemplate(s1,s2,s3) {
 		var blue  = this.blu_transition.get();
 		var width = this.wid_transition.get();
 		
-		ctx.shadowBlur = 3;
+		ctx.shadowBlur = this.blur_amount;
 		ctx.shadowColor = "rgb("+red*3+","+green*3+","+blue*3+")";
 		
 		ctx.beginPath();
@@ -982,7 +1019,7 @@ BackButton.draw = function() {
 	
 	var sqrt2 = Math.sqrt(2);
 	
-	ctx.shadowBlur = 3;
+	ctx.shadowBlur = this.blur_amount;
 	ctx.shadowColor = "rgb("+red*3+","+green*3+","+blue*3+")";
 	
 	var d = 5;
@@ -1030,7 +1067,7 @@ ResetButton.draw = function() {
 	var blue  = this.blu_transition.get();
 	var width = this.wid_transition.get();
 	
-	ctx.shadowBlur = 3;
+	ctx.shadowBlur = this.blur_amount;
 	ctx.shadowColor = "rgb("+red*3+","+green*3+","+blue*3+")";
 	
 	ctx.beginPath();
@@ -1152,6 +1189,9 @@ var drawGrid = function(cell_count,cell_size,p,colors,widths) {
 		ctx.moveTo(p.x,p.y + cell_size.y * y + 0.5);
 		ctx.lineTo(p.x + cell_size.x * cell_count.x,p.y + cell_size.y * y + 0.5);
 	}
+	
+	ctx.moveTo(p.x + cell_size.x * cell_count.x,p.y + cell_size.y * (cell_count.y - 1) + 0.5);
+	
 	ctx.closePath();
 	
 	ctx.stroke();
@@ -1201,15 +1241,16 @@ render = function () {
 	
 	ctx.clearRect(0,0,canvas.width,canvas.height);
 	
+	PlayButton.draw();
+	ResetButton.draw();
+	BackButton.draw();
+	
 	Map.draw();
 	Drawer.draw();
 	if (isDraggingField()) {
 		dragField.draw();
 	}
 	LaserDraw.draw();
-	PlayButton.draw();
-	ResetButton.draw();
-	BackButton.draw();
 	
 	ctx.font="30px Verdana";
 	ctx.fillText("Célpontok száma: " + num_targets,0,canvas.height - 21);
@@ -1418,9 +1459,11 @@ canvas.onmousemove = function(e) {
 	var p = vec2(e.layerX - canvas.offsetLeft,e.layerY - canvas.offsetTop);
 	lastMouseP = p;
 	
-	PlayButton.handleHover(p);
-	ResetButton.handleHover(p);
-	BackButton.handleHover(p);
+	if (!isDraggingField()) {
+		PlayButton.handleHover(p);
+		ResetButton.handleHover(p);
+		BackButton.handleHover(p);		
+	}
 	
 	if (isDraggingField())
 	{
