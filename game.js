@@ -274,7 +274,6 @@ LaserPos.prototype = {
 			ret.push(new LaserPos(this.pos.add(this.rotRight(this.vel)),this.rotRight(this.vel))); 
 		}
 		if (field != null && field.type == FieldT.Gate && !field.washit) {
-			console.log("passed gate");
 			field.washit = true;
 		}
 		if (to_apply == LaserT.Goal && !field.washit) {
@@ -477,7 +476,7 @@ var Field_scale = 0.65;
 var FieldT = {
 	Laser      : {sprite_p: vec2(3,0), left: LaserT.Block,      top: LaserT.Block,      right: LaserT.Emit,       bottom: LaserT.Block      },
 	Mirror     : {sprite_p: vec2(2,0), left: LaserT.MirrorLeft, top: LaserT.MirrorRight,right: LaserT.MirrorLeft, bottom: LaserT.MirrorRight},
-	Gate       : {sprite_p: vec2(1,0), left: LaserT.Pass,       top: LaserT.Block,      right: LaserT.Pass,       bottom: LaserT.Block      },
+	Gate       : {sprite_p: vec2(1,0), left: LaserT.Block,      top: LaserT.Pass,       right: LaserT.Block,      bottom: LaserT.Pass      },
 	Block      : {sprite_p: vec2(0,0), left: LaserT.Block,      top: LaserT.Block,      right: LaserT.Block,      bottom: LaserT.Block      },
 	MirrorPass : {sprite_p: vec2(0,1), left: LaserT.PassLeft,   top: LaserT.PassRight,  right: LaserT.PassLeft,   bottom: LaserT.PassRight  },
 	MirrorMono : {sprite_p: vec2(1,1), left: LaserT.FreeGoal,   top: LaserT.Block,      right: LaserT.MirrorLeft, bottom: LaserT.MirrorRight},
@@ -515,6 +514,10 @@ function Field(p, type, rot, scl) {
 	this.rot  = rot  || 0;
 	this.draw_scale = scl || 1.0;
 	this.washit = false;
+	
+	this.init_rot          = rot || 0;
+	this.init_drawer_place = -1;
+	this.init_map_place    = vec2(-1,-1);
 	
 	this.pos_transition = new Transition(p,p,0);
 	this.rot_transition = new Transition(rot,rot,0);
@@ -600,7 +603,10 @@ var Drawer = {
 	loadItems: function(items) {
 		(function(the_drawer) {
 		items.forEach(function(i,n) {
-			the_drawer.fields.push(new Field(the_drawer.getPosFromIndex(n),i,0,0.95));
+			var field = new Field(the_drawer.getPosFromIndex(n),i,0,0.95);
+			field.init_drawer_place = the_drawer.fields.length;
+			
+			the_drawer.fields.push(field);
 		})})(this);
 	},
 	addItem: function(p,item) {
@@ -795,6 +801,11 @@ var Map = {
 					dragField = this.remItem(i);
 					dragField.setDrawScale(1.05);
 					dragField.setPos(p);									
+				} else {
+					if (this.fields[i.x][i.y].field != null && this.fields[i.x][i.y].field.type == FieldT.Laser) {
+						playing = 1;
+						try_play(true);
+					}
 				}
 			}
 		}
@@ -826,7 +837,10 @@ for (var i = 0;i < GameData[0][0] * GameData[0][1];i++) {
 	var y = Math.floor(i / GameData[0][0]);
 	
 	if (GameData[MapFieldOffset][0] != 0) {
-		Map.forceSet(vec2(x,y),new Field(Map.getPosFromIndex(vec2(x,y)),FieldT.getFromId(GameData[MapFieldOffset][0])));
+		var field = new Field(Map.getPosFromIndex(vec2(x,y)),FieldT.getFromId(GameData[MapFieldOffset][0]));
+		field.init_map_place = vec2(x,y);
+		
+		Map.forceSet(vec2(x,y),field);
 		Map.fields[x][y].field.rot =  GameData[MapFieldOffset][1];
 		Map.fields[x][y].field.setRot(GameData[MapFieldOffset][1]);
 	}
@@ -848,22 +862,28 @@ for (var i = 0;i < GameData[0][0] * GameData[0][1];i++) {
 
 
 /* * * * * * * * * * PLAY BUTTON * * * * * * * * * */
-var PlayButton = {
-	offset: vec2(),
-	mouse_on: false,
-	clicked: false,
-	red_transition: new Transition(0,0,0),
-	gre_transition: new Transition(0,0,0),
-	blu_transition: new Transition(0,0,0),
-	siz_transition: new Transition(20,20,0),
-	wid_transition: new Transition(1,1,0),
-	draw: function() {
-		
+function PlayButtonTemplate(s1,s2,s3) {
+	this.offset   =  vec2();
+	this.mouse_on =  false;
+	this.clicked  =  false;
+	this.normalState = s1 || [20,0,100,0,1];
+	this.hoverState  = s2 || [23,100,200,100,3];
+	this.clickState  = s3 || [21,50,150,50,2];
+	this.red_transition =  new Transition(this.normalState[1],this.normalState[1],0);
+	this.gre_transition =  new Transition(this.normalState[2],this.normalState[2],0);
+	this.blu_transition =  new Transition(this.normalState[3],this.normalState[3],0);
+	this.siz_transition =  new Transition(20,20,0);
+	this.wid_transition =  new Transition(1,1,0);
+	
+	this.draw = function() {
 		var size  = this.siz_transition.get();
 		var red   = this.red_transition.get();
 		var green = this.gre_transition.get();
 		var blue  = this.blu_transition.get();
 		var width = this.wid_transition.get();
+		
+		ctx.shadowBlur = 3;
+		ctx.shadowColor = "rgb("+red*3+","+green*3+","+blue*3+")";
 		
 		ctx.beginPath();
 		ctx.lineWidth = width;
@@ -875,10 +895,16 @@ var PlayButton = {
 		ctx.closePath();
 		
 		ctx.stroke();
-	},
-	normalState: [20,0,100,0,1],
-	hoverState:  [23,100,200,100,3],
-	clickState:  [21,50,150,50,2],
+		
+		ctx.shadowBlur = 0;
+	};
+	this.onPress = function() {
+		playing = 1;
+		try_play(true);
+	};
+};
+
+PlayButtonTemplate.prototype = {
 	applyState: function(from_state,to_state) {
 		var t = 0.1;
 		this.siz_transition.set(from_state[0],to_state[0],t);
@@ -927,8 +953,7 @@ var PlayButton = {
 		if (this.mouse_on && !this.clicked) {
 			this.clicked = true;
 			this.updateState(false,true);
-			playing = 1;
-			try_play(true);
+			this.onPress();
 		}
 	},
 	handleRelease: function(p) {
@@ -939,8 +964,104 @@ var PlayButton = {
 	}
 };
 
+var PlayButton = new PlayButtonTemplate();
+
 PlayButton.offset = vec2(canvas.width,canvas.height).div(vec2(2,2)).add(Map.size.mul(Field_size.mul(Field_scale)).mul(vec2(0,0.5))).add(vec2(0,Field_size.mul(Field_scale).y / 2 + 3))
 
+
+var ResetButton = new PlayButtonTemplate([20,0,0,100,1],[23,100,100,200,3],[21,50,50,150,2]);
+
+ResetButton.offset = PlayButton.offset.add(vec2(Field_size.mul(Field_scale).x,0));
+ResetButton.draw = function() {
+	var size  = this.siz_transition.get();
+	var red   = this.red_transition.get();
+	var green = this.gre_transition.get();
+	var blue  = this.blu_transition.get();
+	var width = this.wid_transition.get();
+	
+	ctx.shadowBlur = 3;
+	ctx.shadowColor = "rgb("+red*3+","+green*3+","+blue*3+")";
+	
+	ctx.beginPath();
+	ctx.lineWidth = width;
+	ctx.strokeStyle = "rgb("+red+","+green+","+blue+")";
+	ctx.moveTo(this.offset.x + size * 0.45,this.offset.y);
+	ctx.arc(this.offset.x,this.offset.y,size * 0.45,0,1.5*Math.PI);
+	ctx.moveTo(this.offset.x + size * 0.45,this.offset.y);
+	ctx.lineTo(this.offset.x + size * 0.75,this.offset.y);
+	ctx.arc(this.offset.x,this.offset.y,size * 0.75,0,1.5*Math.PI);
+	ctx.moveTo(this.offset.x,this.offset.y - size * 0.45);
+	ctx.lineTo(this.offset.x,this.offset.y - size * 0.35);
+	ctx.lineTo(this.offset.x + size * 0.3,this.offset.y - size * 0.6);
+	ctx.lineTo(this.offset.x,this.offset.y - size * 0.85);
+	ctx.lineTo(this.offset.x,this.offset.y - size * 0.75);
+	ctx.moveTo(this.offset.x,this.offset.y - size * 0.75);
+	ctx.closePath();
+	
+	ctx.stroke();
+	
+	ctx.shadowBlur = 0;
+};
+
+ResetButton.onPress = function() {
+	var map_to_drawer = [];
+	var drawer_to_map = [];
+	
+	for (x in Map.fields) {
+		for (y in Map.fields[x]) {
+			var f = Map.fields[x][y];
+			
+			if (f.field != null) {
+				if (f.field.init_map_place.x == -1) {
+					var dat = [];
+					dat.push(f.field);
+					dat.push(f.field.pos);
+					map_to_drawer.push(dat);
+					f.field = null;
+				} else if (f.field.init_drawer_place == -1) {
+					var pp = f.field.init_map_place;
+					if (pp.x != x || pp.y != y) {
+						drawer_to_map.push(Map.remItem(vec2(x,y)));
+					} else {
+						f.field.setRot(f.field.init_rot);
+					}
+				}
+			}
+		}
+	}
+	
+	while (Drawer.fields.length > 0) {
+		var f = Drawer.fields[Drawer.fields.length - 1];
+		
+		if (f.init_drawer_place != -1) {
+			
+			var p = f.pos;
+			
+			var dat = [];
+			dat.push(Drawer.remItem(Drawer.fields.length - 1));
+			dat.push(p);
+			map_to_drawer.push(dat);
+		} else {
+			drawer_to_map.push(Drawer.remItem(Drawer.fields.length - 1));
+		}
+	}
+	
+	for (f of drawer_to_map) {
+		f.setRot(f.init_rot);
+		Map.set(f.init_map_place,f);
+	}
+	
+	map_to_drawer.sort(function(a, b) {
+		return a[0].init_drawer_place - b[0].init_drawer_place;
+	});
+	
+	for (f of map_to_drawer) {
+		
+		f[0].setPos(f[1]);
+		f[0].setRot(f[0].init_rot);
+		Drawer.addItem(f[0].init_map_place,f[0]);
+	}
+}
 
 /* * * * * * * * * * GLOBAL VARIABLES * * * * * * * * * */
 var sprite_sheet = document.getElementById("sprite_sheet");
@@ -1036,6 +1157,7 @@ render = function () {
 	}
 	LaserDraw.draw();
 	PlayButton.draw();
+	ResetButton.draw();
 	
 	ctx.font="30px Verdana";
 	ctx.fillText("Célpontok száma: " + num_targets,0,canvas.height - 21);
@@ -1067,8 +1189,24 @@ var try_play = function(start) {
 				playing = 0;
 				
 				if (num_targets == 0) {
-					map_done();
-					gen_table();
+					
+					var gates_done = true;
+					
+					for (x of Map.fields) {
+						for (y of x) {
+							if (gates_done && y.field != null && y.field.type == FieldT.Gate && y.field.washit == false) {
+								gates_done = false;
+							}
+						}
+					}
+					
+					if (gates_done) {
+						map_done();
+						gen_table();						
+					} else {
+						console.log("not all gates were hit");
+						num_targets = target_needed;
+					}
 				} else {
 					num_targets = target_needed;
 				}
@@ -1168,6 +1306,7 @@ canvas.onmousedown = function(e) {
 		else
 		{
 			PlayButton.handlePress(p);
+			ResetButton.handlePress(p);
 			Drawer.handlePress(p);
 			Map.handlePress(p);
 			dragMode  = 0;
@@ -1183,6 +1322,7 @@ canvas.onmouseup = function(e) {
 		var p = vec2(e.layerX - canvas.offsetLeft,e.layerY - canvas.offsetTop);
 		
 		PlayButton.handleRelease(p);
+		ResetButton.handleRelease(p);
 		
 		if (isDraggingField())
 		{
@@ -1213,6 +1353,7 @@ canvas.onmousemove = function(e) {
 	lastMouseP = p;
 	
 	PlayButton.handleHover(p);
+	ResetButton.handleHover(p);
 	
 	if (isDraggingField())
 	{
