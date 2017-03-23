@@ -969,6 +969,57 @@ var PlayButton = new PlayButtonTemplate();
 PlayButton.offset = vec2(canvas.width,canvas.height).div(vec2(2,2)).add(Map.size.mul(Field_size.mul(Field_scale)).mul(vec2(0,0.5))).add(vec2(0,Field_size.mul(Field_scale).y / 2 + 3))
 
 
+
+var BackButton = new PlayButtonTemplate([20,100,0,0,1],[23,200,100,100,3],[21,150,50,50,2]);
+
+BackButton.offset = PlayButton.offset.add(vec2(-Field_size.mul(Field_scale).x,0));
+BackButton.draw = function() {
+	var size  = this.siz_transition.get();
+	var red   = this.red_transition.get();
+	var green = this.gre_transition.get();
+	var blue  = this.blu_transition.get();
+	var width = this.wid_transition.get();
+	
+	var sqrt2 = Math.sqrt(2);
+	
+	ctx.shadowBlur = 3;
+	ctx.shadowColor = "rgb("+red*3+","+green*3+","+blue*3+")";
+	
+	var d = 5;
+	var l = 10;
+	
+	ctx.beginPath();
+	ctx.lineWidth = width;
+	ctx.strokeStyle = "rgb("+red+","+green+","+blue+")";
+	ctx.moveTo(this.offset.x+d,this.offset.y);
+	ctx.lineTo(this.offset.x+d+l,this.offset.y+l);
+	ctx.lineTo(this.offset.x+l,this.offset.y+l+d);
+	ctx.lineTo(this.offset.x,this.offset.y+d);
+	ctx.lineTo(this.offset.x-l,this.offset.y+l+d);
+	ctx.lineTo(this.offset.x-d-l,this.offset.y+l);
+	ctx.lineTo(this.offset.x-d,this.offset.y);
+
+	ctx.moveTo(this.offset.x-d,this.offset.y);
+	ctx.lineTo(this.offset.x-d,this.offset.y);
+	ctx.lineTo(this.offset.x-d-l,this.offset.y-l);
+	ctx.lineTo(this.offset.x-l,this.offset.y-l-d);
+	ctx.lineTo(this.offset.x,this.offset.y-d);
+	ctx.lineTo(this.offset.x+l,this.offset.y-l-d);
+	ctx.lineTo(this.offset.x+d+l,this.offset.y-l);
+	ctx.lineTo(this.offset.x+d,this.offset.y);
+	ctx.moveTo(this.offset.x+d+l,this.offset.y-l);
+
+	ctx.closePath();
+	
+	ctx.stroke();
+	
+	ctx.shadowBlur = 0;
+};
+BackButton.onPress = function() {
+	gen_table();
+};
+
+
 var ResetButton = new PlayButtonTemplate([20,0,0,100,1],[23,100,100,200,3],[21,50,50,150,2]);
 
 ResetButton.offset = PlayButton.offset.add(vec2(Field_size.mul(Field_scale).x,0));
@@ -1158,6 +1209,7 @@ render = function () {
 	LaserDraw.draw();
 	PlayButton.draw();
 	ResetButton.draw();
+	BackButton.draw();
 	
 	ctx.font="30px Verdana";
 	ctx.fillText("Célpontok száma: " + num_targets,0,canvas.height - 21);
@@ -1226,13 +1278,39 @@ var dragTime = new Date();
 
 var lastMouseP;
 
-window.onkeydown = function(e) {
+var onMouseLeftPress = function(p) {
 	if (isDraggingField())
 	{
-		if (e.keyCode == 82) // r
+		handleDragDrop(p);
+	}
+	else
+	{
+		PlayButton.handlePress(p);
+		ResetButton.handlePress(p);
+		BackButton.handlePress(p);
+		Drawer.handlePress(p);
+		Map.handlePress(p);
+		dragMode  = 0;
+		dragBegP  = p;
+		dragTime  = new Date();
+	}
+}
+
+window.onkeydown = function(e) {
+	if (e.keyCode == 82) // r
+	{
+		if (isDraggingField())
 		{
 			dragField.setRot(dragField.rot + 90);
+		} else {
+			Drawer.handleRightPress(lastMouseP);
+			Map.handleRightPress(lastMouseP);
 		}
+	}
+	
+	if (e.keyCode == 84) // t
+	{
+		onMouseLeftPress(lastMouseP);
 	}
 	
 	if (e.keyCode == 65) 
@@ -1299,20 +1377,7 @@ canvas.onmousedown = function(e) {
 	if (e.button == 0)
 	{
 		var p = vec2(e.layerX - canvas.offsetLeft,e.layerY - canvas.offsetTop);
-		if (isDraggingField())
-		{
-			handleDragDrop(p);
-		}
-		else
-		{
-			PlayButton.handlePress(p);
-			ResetButton.handlePress(p);
-			Drawer.handlePress(p);
-			Map.handlePress(p);
-			dragMode  = 0;
-			dragBegP  = p;
-			dragTime  = new Date();
-		}
+		onMouseLeftPress(p);
 	}
 };
 
@@ -1323,6 +1388,7 @@ canvas.onmouseup = function(e) {
 		
 		PlayButton.handleRelease(p);
 		ResetButton.handleRelease(p);
+		BackButton.handleRelease(p);
 		
 		if (isDraggingField())
 		{
@@ -1354,6 +1420,7 @@ canvas.onmousemove = function(e) {
 	
 	PlayButton.handleHover(p);
 	ResetButton.handleHover(p);
+	BackButton.handleHover(p);
 	
 	if (isDraggingField())
 	{

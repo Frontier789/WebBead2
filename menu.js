@@ -90,7 +90,7 @@ var gen_table = function() {
 
 var load_map = function(m) {
 	act_map = m;
-	document.getElementById("game_map").innerHTML = document.getElementById("game_map_"+m).innerHTML;
+	document.getElementById("game_map").innerHTML = document.getElementById("maps_div").childNodes[2*m + 1].innerHTML;
 	load_game();
 };
 
