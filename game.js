@@ -7,7 +7,7 @@ window.requestAnimFrame = (function() {
 			window.webkitRequestAnimationFrame ||
 			window.mozRequestAnimationFrame    ||
 			function(callback) {
-				window.setTimeout(callback, 1000 / 60);
+				window.setTimeout(callback, 1000 / 30);
 			};
 })();
 
@@ -220,6 +220,9 @@ LaserPos.prototype = {
 		
 		return tmpLaser.vel;
 	},
+	eq: function(lp) {
+		return this.pos.eq(lp.pos) && this.vel.eq(lp.vel);
+	},
 	getSide: function(field) {
 		if (field == null) {
 			return LaserT.Pass;
@@ -299,6 +302,7 @@ function LaserPath(beg,lp) {
 	this.lpos = lp || null;
 	this.cur_transition = new Transition(beg,beg,0);
 	this.reversed = false;
+	this.batch_points = [];
 };
 
 LaserPath.prototype = {
@@ -312,11 +316,11 @@ LaserPath.prototype = {
 	},
 	step: function() {
 		if (this.lpos != null) {
+			var ret = [];
+			
 			if (!this.reversed) {
 				var next_lposes = this.lpos.step(Map.fields[this.lpos.pos.x][this.lpos.pos.y].field);
 			
-				var ret = [];
-				
 				for (p in next_lposes) {
 					ret.push(new LaserPath);
 					ret[p].cur = this.cur;
@@ -331,17 +335,42 @@ LaserPath.prototype = {
 					ret[p].cur_transition.set(this.cur,this.cur,0);
 					ret[p].lpos = next_lposes[p];
 					ret[p].add(Map.getPosFromIndex(next_lposes[p].pos));
+					ret[p].batch_points = this.batch_points.slice();
 				}
 				
-				return ret;
+				if (ret.length > 1) {
+					for (f of ret) {
+						
+						var done = false;
+						
+						for (lp of f.batch_points) {
+							if (lp.eq(f.lpos)) {
+								console.log("circle detected");
+								LaserDraw.circle_detected = true;
+								ret = [this];
+								done = true;
+								break;
+							}
+						}
+						
+						if (done) {
+							break;
+						}
+						
+						f.batch_points.push(f.lpos);
+					}
+				}
+				
 			} else {
 				if (this.arr.length > 1) {
 					this.cur_transition.set(this.arr[this.arr.length - 2],this.arr[this.arr.length - 1],0.1,true,Transition.Linear);
 					this.arr.splice(this.arr.length - 1,1);
-					return [this];
+
+					ret.push(this);
 				}
-				return [];
 			}
+			
+			return ret;
 		}
 	},
 	reverse: function() {
@@ -360,10 +389,15 @@ LaserPath.prototype = {
 		if (this.arr.length > 0) {
 			
 			ctx.shadowBlur = 2;
-			ctx.shadowColor = "#ff0000";
 			
 			ctx.beginPath();
-			ctx.strokeStyle = "#ff9ab2";
+			if (LaserDraw.circle_detected) {
+				ctx.strokeStyle = "#b29aff";
+				ctx.shadowColor = "#0000ff";
+			} else {
+				ctx.strokeStyle = "#ff9ab2";
+				ctx.shadowColor = "#ff0000";
+			}
 			ctx.lineWidth = 1;
 			
 			ctx.moveTo(this.arr[0].x,this.arr[0].y);
@@ -388,6 +422,7 @@ LaserPath.prototype = {
 var LaserDraw = {
 	paths: [],
 	finished_paths: [],
+	circle_detected: false,
 	reset: function() {
 		paths = [];
 		finished_paths = [];
@@ -409,6 +444,8 @@ var LaserDraw = {
 	},
 	step: function() {
 		if (!this.started()) {
+			this.circle_detected = false;
+			
 			for (var x = 0;x < Map.fields.length;x++) {
 				for (var y = 0;y < Map.fields[x].length;y++) {
 					
@@ -427,7 +464,7 @@ var LaserDraw = {
 		} else {
 			var tmp = [];
 			for (l of this.paths) {
-				if (l.lpos.pos.x >= 0 && l.lpos.pos.y >= 0 && l.lpos.pos.x < Map.size.x && l.lpos.pos.y < Map.size.y) {
+				if (l.lpos.pos.x >= 0 && l.lpos.pos.y >= 0 && l.lpos.pos.x < Map.size.x && l.lpos.pos.y < Map.size.y && !this.circle_detected) {
 					
 					var nexts = l.step();
 					
@@ -471,8 +508,8 @@ var LaserDraw = {
 
 
 /* * * * * * * * * * FIELD TYPE * * * * * * * * * */
-var Field_size  = vec2(85,85);
-var Field_scale = 0.65;
+var Field_size  = vec2(55,55);
+var Field_scale = 1;
 var FieldT = {
 	Laser      : {sprite_p: vec2(3,0), left: LaserT.Block,      top: LaserT.Block,      right: LaserT.Emit,       bottom: LaserT.Block      },
 	Mirror     : {sprite_p: vec2(2,0), left: LaserT.MirrorLeft, top: LaserT.MirrorRight,right: LaserT.MirrorLeft, bottom: LaserT.MirrorRight},
@@ -905,11 +942,11 @@ function PlayButtonTemplate(s1,s2,s3) {
 	this.normalState = s1 || [20,0,100,0,1];
 	this.hoverState  = s2 || [23,100,200,100,3];
 	this.clickState  = s3 || [21,50,150,50,2];
+	this.siz_transition = new Transition(this.normalState[0],this.normalState[0],0);
 	this.red_transition = new Transition(this.normalState[1],this.normalState[1],0);
 	this.gre_transition = new Transition(this.normalState[2],this.normalState[2],0);
 	this.blu_transition = new Transition(this.normalState[3],this.normalState[3],0);
-	this.siz_transition = new Transition(20,20,0);
-	this.wid_transition = new Transition(1,1,0);
+	this.wid_transition = new Transition(this.normalState[4],this.normalState[4],0);
 	this.blur_amount    = 2;
 	
 	this.draw = function() {
@@ -936,6 +973,9 @@ function PlayButtonTemplate(s1,s2,s3) {
 		ctx.shadowBlur = 0;
 	};
 	this.onPress = function() {
+		
+	};
+	this.onRelease = function() {
 		playing = 1;
 		try_play(true);
 	};
@@ -997,6 +1037,9 @@ PlayButtonTemplate.prototype = {
 		if (this.clicked) {
 			this.clicked = false;
 			this.updateState(false,true);
+			if (this.mouse_on) {
+				this.onRelease();
+			}
 		}
 	}
 };
@@ -1022,8 +1065,8 @@ BackButton.draw = function() {
 	ctx.shadowBlur = this.blur_amount;
 	ctx.shadowColor = "rgb("+red*3+","+green*3+","+blue*3+")";
 	
-	var d = 5;
-	var l = 10;
+	var d = size / 4;
+	var l = size / 2;
 	
 	ctx.beginPath();
 	ctx.lineWidth = width;
@@ -1035,16 +1078,13 @@ BackButton.draw = function() {
 	ctx.lineTo(this.offset.x-l,this.offset.y+l+d);
 	ctx.lineTo(this.offset.x-d-l,this.offset.y+l);
 	ctx.lineTo(this.offset.x-d,this.offset.y);
-
-	ctx.moveTo(this.offset.x-d,this.offset.y);
-	ctx.lineTo(this.offset.x-d,this.offset.y);
+	
 	ctx.lineTo(this.offset.x-d-l,this.offset.y-l);
 	ctx.lineTo(this.offset.x-l,this.offset.y-l-d);
 	ctx.lineTo(this.offset.x,this.offset.y-d);
 	ctx.lineTo(this.offset.x+l,this.offset.y-l-d);
 	ctx.lineTo(this.offset.x+d+l,this.offset.y-l);
 	ctx.lineTo(this.offset.x+d,this.offset.y);
-	ctx.moveTo(this.offset.x+d+l,this.offset.y-l);
 
 	ctx.closePath();
 	
@@ -1052,7 +1092,7 @@ BackButton.draw = function() {
 	
 	ctx.shadowBlur = 0;
 };
-BackButton.onPress = function() {
+BackButton.onRelease = function() {
 	gen_table();
 };
 
@@ -1091,7 +1131,7 @@ ResetButton.draw = function() {
 	ctx.shadowBlur = 0;
 };
 
-ResetButton.onPress = function() {
+ResetButton.onRelease = function() {
 	var map_to_drawer = [];
 	var drawer_to_map = [];
 	
@@ -1144,7 +1184,6 @@ ResetButton.onPress = function() {
 	});
 	
 	for (f of map_to_drawer) {
-		
 		f[0].setPos(f[1]);
 		f[0].setRot(f[0].init_rot);
 		Drawer.addItem(f[0].init_map_place,f[0]);
