@@ -409,7 +409,7 @@ LaserPath.prototype = {
 			var last = this.cur_transition.get(); 
 			ctx.lineTo(last.x,last.y);
 			
-			ctx.moveTo(this.arr[0].x,this.arr[0].y);
+			ctx.moveTo(last.x,last.y);
 			ctx.closePath();
 			
 			ctx.stroke();
