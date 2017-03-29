@@ -513,13 +513,13 @@ var Field_scale = 1;
 var FieldT = {
 	Laser      : {sprite_p: vec2(3,0), left: LaserT.Block,      top: LaserT.Block,      right: LaserT.Emit,       bottom: LaserT.Block      },
 	Mirror     : {sprite_p: vec2(2,0), left: LaserT.MirrorLeft, top: LaserT.MirrorRight,right: LaserT.MirrorLeft, bottom: LaserT.MirrorRight},
-	Gate       : {sprite_p: vec2(1,0), left: LaserT.Block,      top: LaserT.Pass,       right: LaserT.Block,      bottom: LaserT.Pass      },
-	Block      : {sprite_p: vec2(0,0), left: LaserT.Block,      top: LaserT.Block,      right: LaserT.Block,      bottom: LaserT.Block      },
+	Gate       : {sprite_p: vec2(1,0), left: LaserT.Block,      top: LaserT.Pass,       right: LaserT.Block,      bottom: LaserT.Pass       },
+	Block      : {sprite_p: vec2(0,0), left: LaserT.Pass,       top: LaserT.Pass,       right: LaserT.Pass,       bottom: LaserT.Pass       },
 	MirrorPass : {sprite_p: vec2(0,1), left: LaserT.PassLeft,   top: LaserT.PassRight,  right: LaserT.PassLeft,   bottom: LaserT.PassRight  },
 	MirrorMono : {sprite_p: vec2(1,1), left: LaserT.FreeGoal,   top: LaserT.Block,      right: LaserT.MirrorLeft, bottom: LaserT.MirrorRight},
 	MirrorGoal : {sprite_p: vec2(2,1), left: LaserT.Goal,       top: LaserT.Block,      right: LaserT.MirrorLeft, bottom: LaserT.MirrorRight},
 	Goal       : {sprite_p: vec2(0,2), left: LaserT.Goal,       top: LaserT.Goal,       right: LaserT.Goal,       bottom: LaserT.Goal       },
-	Forbidden  : {sprite_p: vec2(3,1), left: LaserT.Pass,       top: LaserT.Pass,       right: LaserT.Pass,       bottom: LaserT.Pass       },
+	Forbidden  : {sprite_p: vec2(3,1), left: LaserT.Block,      top: LaserT.Block,      right: LaserT.Block,      bottom: LaserT.Block      },
 	getFromId: function(id) {
 		if (id == 1) return this.Laser     ;
 		if (id == 2) return this.Mirror    ;
@@ -951,9 +951,9 @@ function PlayButtonTemplate(s1,s2,s3) {
 	
 	this.draw = function() {
 		var size  = this.siz_transition.get();
-		var red   = this.red_transition.get();
-		var green = this.gre_transition.get();
-		var blue  = this.blu_transition.get();
+		var red   = Math.floor(this.red_transition.get());
+		var green = Math.floor(this.gre_transition.get());
+		var blue  = Math.floor(this.blu_transition.get());
 		var width = this.wid_transition.get();
 		
 		ctx.shadowBlur = this.blur_amount;
@@ -1019,11 +1019,17 @@ PlayButtonTemplate.prototype = {
 		var mouse = (p.sub(this.offset).length() < this.siz_transition.get());
 		
 		if (mouse && !this.mouse_on) {
+			
 			this.mouse_on = true;
 			this.updateState(true,false);
+			canvas.style.cursor = "pointer";
+			
 		} else if (!mouse && this.mouse_on) {
+			
 			this.mouse_on = false;
 			this.updateState(true,false);
+			canvas.style.cursor = "";
+			
 		}
 	},
 	handlePress: function(p) {
@@ -1055,9 +1061,9 @@ var BackButton = new PlayButtonTemplate([20,100,0,0,1],[23,200,100,100,3],[21,15
 BackButton.offset = PlayButton.offset.add(vec2(-Field_size.mul(Field_scale).x,0));
 BackButton.draw = function() {
 	var size  = this.siz_transition.get();
-	var red   = this.red_transition.get();
-	var green = this.gre_transition.get();
-	var blue  = this.blu_transition.get();
+	var red   = Math.floor(this.red_transition.get());
+	var green = Math.floor(this.gre_transition.get());
+	var blue  = Math.floor(this.blu_transition.get());
 	var width = this.wid_transition.get();
 	
 	var sqrt2 = Math.sqrt(2);
@@ -1102,9 +1108,9 @@ var ResetButton = new PlayButtonTemplate([20,0,0,100,1],[23,100,100,200,3],[21,5
 ResetButton.offset = PlayButton.offset.add(vec2(Field_size.mul(Field_scale).x,0));
 ResetButton.draw = function() {
 	var size  = this.siz_transition.get();
-	var red   = this.red_transition.get();
-	var green = this.gre_transition.get();
-	var blue  = this.blu_transition.get();
+	var red   = Math.floor(this.red_transition.get());
+	var green = Math.floor(this.gre_transition.get());
+	var blue  = Math.floor(this.blu_transition.get());
 	var width = this.wid_transition.get();
 	
 	ctx.shadowBlur = this.blur_amount;
@@ -1331,12 +1337,27 @@ var try_play = function(start) {
 							}
 						}
 					}
+
+					var all_hit = true;
+
+					for (x of Map.fields) {
+						for (y of x) {
+							if (y.field != null && (y.field.type == FieldT.MirrorGoal || y.field.type == FieldT.Goal) && !y.field.washit) {
+								all_hit = false;
+							}
+						}
+					}
 					
-					if (gates_done) {
+					if (gates_done && all_hit) {
 						map_done();
 						gen_table();						
 					} else {
-						console.log("not all gates were hit");
+						if (!gates_done) {
+							console.log("not all gates were hit");
+						}
+						if (!all_hit) {
+							console.log("not all goals were hit");
+						}
 						num_targets = target_needed;
 					}
 				} else {
@@ -1358,33 +1379,43 @@ var dragTime = new Date();
 
 var lastMouseP;
 
+var isModyfingAllowed = function() {
+	return playing == 0;
+}
+
 var onMouseLeftPress = function(p) {
-	if (isDraggingField())
+	if (isModyfingAllowed())
 	{
-		handleDragDrop(p);
-	}
-	else
-	{
-		PlayButton.handlePress(p);
-		ResetButton.handlePress(p);
-		BackButton.handlePress(p);
-		Drawer.handlePress(p);
-		Map.handlePress(p);
-		dragMode  = 0;
-		dragBegP  = p;
-		dragTime  = new Date();
+		if (isDraggingField())
+		{
+			handleDragDrop(p);
+		}
+		else
+		{
+			PlayButton.handlePress(p);
+			ResetButton.handlePress(p);
+			BackButton.handlePress(p);
+			Drawer.handlePress(p);
+			Map.handlePress(p);
+			dragMode  = 0;
+			dragBegP  = p;
+			dragTime  = new Date();
+		}
 	}
 }
 
 window.onkeydown = function(e) {
 	if (e.keyCode == 82) // r
 	{
-		if (isDraggingField())
+		if (isModyfingAllowed())
 		{
-			dragField.setRot(dragField.rot + 90);
-		} else {
-			Drawer.handleRightPress(lastMouseP);
-			Map.handleRightPress(lastMouseP);
+			if (isDraggingField())
+			{
+				dragField.setRot(dragField.rot + 90);
+			} else {
+				Drawer.handleRightPress(lastMouseP);
+				Map.handleRightPress(lastMouseP);
+			}
 		}
 	}
 	
@@ -1400,6 +1431,7 @@ window.onkeydown = function(e) {
 	
 	if (e.keyCode == 66) 
 	{
+		playing = 1;
 		playing = 1;
 		try_play(true);
 	}
@@ -1417,24 +1449,47 @@ window.onkeydown = function(e) {
 		var n = e.keyCode - 48;
 		if (n > 9) n += 48 - 96;
 		
-		if (!isDraggingField()) {
-			dragMode = 2;
-			Drawer.handlePress(Drawer.getPosFromIndex(n));
-			dragField.setPos(lastMouseP);
+		if (n == 0) {
+			n = 9;
 		} else {
-			handleDragDrop(Drawer.getPosFromIndex(n).add(vec2(canvas.width,0)));
+			n--;
+		}
+		
+		if (isModyfingAllowed()) {
+			if (!isDraggingField()) {
+				dragMode = 2;
+				Drawer.handlePress(Drawer.getPosFromIndex(n));
+				dragField.setPos(lastMouseP);
+			} else {
+				handleDragDrop(Drawer.getPosFromIndex(n).add(vec2(canvas.width,0)));
+			}
 		}
 	}
 };
 
 window.onkeyup = function(e) {
 	
+	if (e.keyCode == 84) // t
+	{
+		PlayButton.handleRelease(lastMouseP);
+		ResetButton.handleRelease(lastMouseP);
+		BackButton.handleRelease(lastMouseP);
+	}
+	
 };
+
+var getPosFromEvent = function(e) {
+	
+	var rect = canvas.getBoundingClientRect();
+    return vec2(e.clientX - rect.left,e.clientY - rect.top);
+	
+	// return vec2(e.layerX - canvas.offsetLeft,e.layerY - canvas.offsetTop);
+}
 
 canvas.onmouseleave = function(e) {
 	if (isDraggingField())
 	{
-		var p = vec2(e.layerX - canvas.offsetLeft,e.layerY - canvas.offsetTop);
+		var p = getPosFromEvent(e);
 		Drawer.addItem(p,dragField);
 		dragField = null;
 	}
@@ -1443,20 +1498,24 @@ canvas.onmouseleave = function(e) {
 canvas.onmousedown = function(e) {
 	if (e.button == 2)
 	{
-		var p = vec2(e.layerX - canvas.offsetLeft,e.layerY - canvas.offsetTop);
-		if (isDraggingField())
+		var p = getPosFromEvent(e);
+		
+		if (isModyfingAllowed())
 		{
-			dragField.setRot(dragField.rot + 90);
-		}
-		else
-		{
-			Drawer.handleRightPress(p);
-			Map.handleRightPress(p);
+			if (isDraggingField())
+			{
+				dragField.setRot(dragField.rot + 90);
+			}
+			else
+			{
+				Drawer.handleRightPress(p);
+				Map.handleRightPress(p);
+			}
 		}
 	}
 	if (e.button == 0)
 	{
-		var p = vec2(e.layerX - canvas.offsetLeft,e.layerY - canvas.offsetTop);
+		var p = getPosFromEvent(e);
 		onMouseLeftPress(p);
 	}
 };
@@ -1464,30 +1523,33 @@ canvas.onmousedown = function(e) {
 canvas.onmouseup = function(e) {
 	if (e.button == 0)
 	{
-		var p = vec2(e.layerX - canvas.offsetLeft,e.layerY - canvas.offsetTop);
+		var p = getPosFromEvent(e);
 		
-		PlayButton.handleRelease(p);
-		ResetButton.handleRelease(p);
-		BackButton.handleRelease(p);
-		
-		if (isDraggingField())
+		if (isModyfingAllowed())
 		{
-			if (dragMode == 1)
+			PlayButton.handleRelease(p);
+			ResetButton.handleRelease(p);
+			BackButton.handleRelease(p);
+			
+			if (isDraggingField())
 			{
-				handleDragDrop(p);
-				dragMode = 2;
-			}
-			else
-			{
-				var dt = ((new Date()) - dragTime) / 1000;
-				
-				if (dt < 0.3)
-				{
-					dragMode = 2;
-				}
-				else if (dragMode == 0)
+				if (dragMode == 1)
 				{
 					handleDragDrop(p);
+					dragMode = 2;
+				}
+				else
+				{
+					var dt = ((new Date()) - dragTime) / 1000;
+					
+					if (dt < 0.3)
+					{
+						dragMode = 2;
+					}
+					else if (dragMode == 0)
+					{
+						handleDragDrop(p);
+					}
 				}
 			}
 		}
@@ -1495,7 +1557,7 @@ canvas.onmouseup = function(e) {
 };
 
 canvas.onmousemove = function(e) {
-	var p = vec2(e.layerX - canvas.offsetLeft,e.layerY - canvas.offsetTop);
+	var p = getPosFromEvent(e);
 	lastMouseP = p;
 	
 	if (!isDraggingField()) {

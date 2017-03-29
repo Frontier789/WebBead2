@@ -13,7 +13,12 @@ body {
 }
 
 .map_btn_red:hover {
+	cursor: pointer;
     background: url(btns/btn_bckg_red_small.png) no-repeat;
+}
+
+.map_btn_red:focus {
+	outline: 0;
 }
 
 .map_btn_avail {
@@ -27,11 +32,16 @@ body {
 }
 
 .map_btn_avail:hover {
+	cursor: pointer;
     background: url(btns/btn_bckg_blue.png) no-repeat;
 }
 
 .map_btn_avail:active {
     background: url(btns/btn_bckg_white.png) no-repeat;
+}
+
+.map_btn_avail:focus {
+	outline: 0;
 }
 
 .map_btn_done {
@@ -45,11 +55,16 @@ body {
 }
 
 .map_btn_done:hover {
+	cursor: pointer;
     background: url(btns/btn_bckg_blue.png) no-repeat;
 }
 
 .map_btn_done:active {
     background: url(btns/btn_bckg_green.png) no-repeat;
+}
+
+.map_btn_done:focus {
+	outline: 0;
 }
 
 .map_btn_text {
