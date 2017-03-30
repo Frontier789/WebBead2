@@ -268,7 +268,7 @@ LaserPos.prototype = {
 		var ret = [];
 		
 		if (to_apply == LaserT.Pass || to_apply == LaserT.PassLeft || to_apply == LaserT.PassRight) {
-			ret.push(new LaserPos(this.pos.add(this.vel),this.vel)); 
+			ret.push(new LaserPos(this.pos.add(this.vel),this.vel));
 		}
 		if (to_apply == LaserT.MirrorLeft || to_apply == LaserT.PassLeft) {
 			ret.push(new LaserPos(this.pos.add(this.rotLeft(this.vel)),this.rotLeft(this.vel))); 
@@ -286,6 +286,9 @@ LaserPos.prototype = {
 		if (to_apply == LaserT.FreeGoal && !field.washit) {
 			field.washit = true;
 			num_targets--;
+		}
+		if (field != null) {
+			field.laser_use = true;
 		}
 		
 		return ret;
@@ -332,9 +335,23 @@ LaserPath.prototype = {
 							ret[p].arr.push(this.cur);
 						}
 					}
+					
+					var nextPos = Map.getPosFromIndex(next_lposes[p].pos);
+					var pref = next_lposes[p];
+					
+					if (pref.pos.x >= 0 && pref.pos.x < Map.size.x && 
+						pref.pos.y >= 0 && pref.pos.y < Map.size.y) {
+							var field = Map.fields[pref.pos.x][pref.pos.y].field;
+						if (pref.step(field).length == 0) {
+							if (field != null && field.type != FieldT.Goal) {
+								nextPos = nextPos.sub(this.cur).mul(0.75).add(this.cur);
+							}
+						}
+					}
+					
 					ret[p].cur_transition.set(this.cur,this.cur,0);
 					ret[p].lpos = next_lposes[p];
-					ret[p].add(Map.getPosFromIndex(next_lposes[p].pos));
+					ret[p].add(nextPos);
 					ret[p].batch_points = this.batch_points.slice();
 				}
 				
@@ -395,10 +412,10 @@ LaserPath.prototype = {
 				ctx.strokeStyle = "#b29aff";
 				ctx.shadowColor = "#0000ff";
 			} else {
-				ctx.strokeStyle = "#ff9ab2";
+				ctx.strokeStyle = "#ff3464";
 				ctx.shadowColor = "#ff0000";
 			}
-			ctx.lineWidth = 1;
+			ctx.lineWidth = 2;
 			
 			ctx.moveTo(this.arr[0].x,this.arr[0].y);
 			
@@ -550,7 +567,8 @@ function Field(p, type, rot, scl) {
 	this.type = type || 0;
 	this.rot  = rot  || 0;
 	this.draw_scale = scl || 1.0;
-	this.washit = false;
+	this.washit     = false;
+	this.laser_use  = false;
 	
 	this.init_rot          = rot || 0;
 	this.init_drawer_place = -1;
@@ -770,6 +788,7 @@ var Map = {
 		return index.mul(Field_size.mul(Field_scale)).add(this.offset).add(Field_size.mul(Field_scale).div(2));
 	},
 	draw: function() {
+		
 		drawGrid(this.size,
 				 Field_size.mul(Field_scale),
 				 this.offset,
@@ -793,9 +812,10 @@ var Map = {
 					if (f.fixed) {
 						var p = map.getPosFromIndex(vec2(x,y)).add(Field_size.mul(Field_scale).mul(vec2(-1,-1)).div(2));
 						if (f.rotfix) {
-							ctx.drawImage(lock_rot_img,p.x + 3,p.y + 3);
-						} else {
+							// ctx.drawImage(lock_rot_img,p.x + 3,p.y + 3);
 							ctx.drawImage(lock_img,p.x + 3,p.y + 3);
+						} else {
+							// ctx.drawImage(lock_img,p.x + 3,p.y + 3);
 						}
 					}
 				}
@@ -1138,6 +1158,9 @@ ResetButton.draw = function() {
 };
 
 ResetButton.onRelease = function() {
+	
+	if (!isModyfingAllowed()) return;
+	
 	var map_to_drawer = [];
 	var drawer_to_map = [];
 	
@@ -1209,7 +1232,10 @@ var isDraggingField = function() {
 
 var drawGrid = function(cell_count,cell_size,p,colors,widths) {
 	
+	ctx.stroke();
+	
 	ctx.beginPath();
+	ctx.shadowBlur = 0;
 	ctx.lineWidth = widths[0];
 	ctx.strokeStyle = colors[0];
 	ctx.moveTo(p.x + 0.5,p.y + 0.5);
@@ -1281,6 +1307,40 @@ var target_needed = GameData[0][2];
 var num_targets = target_needed;
 var playing = 0;
 
+/* * * * * * * * * * ERROR SIGNER * * * * * * * * * */
+var ErrorSigner = {
+	error_pts: [],
+	red_transition: new Transition(0,0,0),
+	color_inc: false,
+	draw: function() {
+		if (this.error_pts.length) {
+			if (this.red_transition.finished()) {
+				if (!this.color_inc) {
+					this.red_transition.set(1,0,2);
+					this.color_inc = true;
+				} else {
+					this.error_pts = [];
+					return;
+				}
+			}
+			
+			var s = Field_size.mul(Field_scale);
+			
+			for (p of this.error_pts) {
+				drawGrid(vec2(1,1),
+						 s,
+						 p.sub(s.div(2)),
+						 ["rgba(255,0,0,"+this.red_transition.get()+")","#000000"],[2 + this.red_transition.get() * 6,0.1]);
+			}
+		}
+	},
+	add: function(p) {
+		this.error_pts.push(p);
+		this.color_inc = false;
+		this.red_transition.set(0,1,0.2);
+	}
+};
+
 /* * * * * * * * * * RENDERING METHOD * * * * * * * * * */
 render = function () {
 	
@@ -1292,13 +1352,30 @@ render = function () {
 	
 	Map.draw();
 	Drawer.draw();
+	ErrorSigner.draw();
 	if (isDraggingField()) {
 		dragField.draw();
 	}
 	LaserDraw.draw();
 	
+	ctx.font="13px Verdana";
+	ctx.fillStyle = "#000000";
+	ctx.fillText("Célpontok száma:",20,30);
+	var wText = ctx.measureText("Célpontok száma:").width;
+	
+	drawGrid(vec2(1,1),
+			 Field_size.mul(Field_scale),
+			 vec2(20 + wText / 2 - Field_size.mul(Field_scale).x / 2,50),
+			 ["#cfcfcf","#000000"],[1.5,0.1]);
+
 	ctx.font="30px Verdana";
-	ctx.fillText("Célpontok száma: " + num_targets,0,canvas.height - 21);
+	ctx.fillStyle = "#b30000";
+	ctx.shadowBlur = 3;
+	ctx.shadowColor = "#ff4d4d";
+	var wNtarget = ctx.measureText(""+num_targets).width;	
+	
+	ctx.fillText(""+num_targets,20 + wText / 2 - wNtarget / 2,50 + Field_size.mul(Field_scale).y / 2 + 10);
+	
 	
 	if (playing == 1) {
 		try_play(false);
@@ -1318,6 +1395,7 @@ var try_play = function(start) {
 			for (y of x) {
 				if (y.field != null) {
 					y.field.washit = false;
+					y.field.laser_use = false;
 				}				
 			}
 		}
@@ -1329,34 +1407,48 @@ var try_play = function(start) {
 				if (num_targets == 0) {
 					
 					var gates_done = true;
+					var items_used = true;
 					
-					for (x of Map.fields) {
-						for (y of x) {
-							if (gates_done && y.field != null && y.field.type == FieldT.Gate && y.field.washit == false) {
-								gates_done = false;
+					for (x in Map.fields) {
+						for (y in Map.fields[x]) {
+							var field = Map.fields[x][y].field;
+							if (field != null) {
+								if (field.type == FieldT.Gate && field.washit == false) {
+									gates_done = false;
+									ErrorSigner.add(Map.getPosFromIndex(vec2(x,y)));
+								}
+								if (field.type != FieldT.Block && field.type != FieldT.Forbidden && field.type != FieldT.Laser && field.laser_use == false) {
+									items_used = false;
+									ErrorSigner.add(Map.getPosFromIndex(vec2(x,y)));
+								}
 							}
 						}
 					}
 
 					var all_hit = true;
 
-					for (x of Map.fields) {
-						for (y of x) {
+					for (x in Map.fields) {
+						for (y in Map.fields[x]) {
+							var field = Map.fields[x][y].field;
 							if (y.field != null && (y.field.type == FieldT.MirrorGoal || y.field.type == FieldT.Goal) && !y.field.washit) {
 								all_hit = false;
+								ErrorSigner.add(Map.getPosFromIndex(vec2(x,y)));
 							}
 						}
 					}
 					
-					if (gates_done && all_hit) {
+					if (gates_done && all_hit && items_used) {
 						map_done();
-						gen_table();						
+						gen_table();
 					} else {
 						if (!gates_done) {
 							console.log("not all gates were hit");
 						}
 						if (!all_hit) {
 							console.log("not all goals were hit");
+						}
+						if (!items_used) {
+							console.log("unused items");
 						}
 						num_targets = target_needed;
 					}
@@ -1384,17 +1476,18 @@ var isModyfingAllowed = function() {
 }
 
 var onMouseLeftPress = function(p) {
-	if (isModyfingAllowed())
+	if (isDraggingField())
 	{
-		if (isDraggingField())
+		handleDragDrop(p);
+	}
+	else
+	{
+		PlayButton.handlePress(p);
+		ResetButton.handlePress(p);
+		BackButton.handlePress(p);
+		
+		if (isModyfingAllowed())
 		{
-			handleDragDrop(p);
-		}
-		else
-		{
-			PlayButton.handlePress(p);
-			ResetButton.handlePress(p);
-			BackButton.handlePress(p);
 			Drawer.handlePress(p);
 			Map.handlePress(p);
 			dragMode  = 0;
@@ -1457,9 +1550,11 @@ window.onkeydown = function(e) {
 		
 		if (isModyfingAllowed()) {
 			if (!isDraggingField()) {
-				dragMode = 2;
-				Drawer.handlePress(Drawer.getPosFromIndex(n));
-				dragField.setPos(lastMouseP);
+				if (n < Drawer.fields.length) {
+					dragMode = 2;
+					Drawer.handlePress(Drawer.getPosFromIndex(n));
+					dragField.setPos(lastMouseP);
+				}
 			} else {
 				handleDragDrop(Drawer.getPosFromIndex(n).add(vec2(canvas.width,0)));
 			}
@@ -1525,11 +1620,12 @@ canvas.onmouseup = function(e) {
 	{
 		var p = getPosFromEvent(e);
 		
+		PlayButton.handleRelease(p);
+		ResetButton.handleRelease(p);
+		BackButton.handleRelease(p);
+		
 		if (isModyfingAllowed())
 		{
-			PlayButton.handleRelease(p);
-			ResetButton.handleRelease(p);
-			BackButton.handleRelease(p);
 			
 			if (isDraggingField())
 			{

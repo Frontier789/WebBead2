@@ -1,4 +1,5 @@
 
+var title = null;
 var table = null;
 var canvas = null;
 var game_script = null;
@@ -25,6 +26,7 @@ var update_map_states = function() {
 
 var load_game = function() {
 	safe_del(table);
+	safe_del(title);
 	
 	canvas = document.createElement("canvas");
 	canvas.setAttribute("id","game_canvas");
@@ -47,6 +49,14 @@ var safe_del = function(e) {
 };
 
 var gen_table = function() {
+	title = document.createElement("h1");
+	title.setAttribute("class","game_title");
+	title.innerHTML = "DAT GAME 01"
+	document.body.appendChild(title);
+	
+	window.onkeydown = function(e) {};
+	window.onkeyup   = function(e) {};
+	
 	table = document.createElement("table");
 	table.setAttribute("class","map_table");
 
@@ -61,21 +71,43 @@ var gen_table = function() {
 		}
 	}
 	update_map_states();
-
+	
+	var map_names = ["A","","B","","C"];
+	
+	var btn_i = 0;
+	
 	for (var x = 0;x < w;++x)
 	{
 		var row = document.createElement("tr");
+		row.setAttribute("class","button_tr");
 		for (var y = 0;y < h;++y)
 		{
-			var data = document.createElement("td");
-			
-			if (map_states[y+x*w] == 0) {
-				data.innerHTML = "<button class='map_btn_red'><p class='map_btn_text'>" + (y+x*w+1) + "</p></button>";
-			} else if (map_states[y+x*w] == 1) {
-				data.innerHTML = "<button class='map_btn_avail' onclick='load_map(" + (y+x*w) + ")'><p class='map_btn_text'>" + (y+x*w+1) + "</p></button>";
-			} else if (map_states[y+x*w] == 2) {
-				data.innerHTML = "<button class='map_btn_done' onclick='load_map(" + (y+x*w) + ")'><p class='map_btn_text'>" + (y+x*w+1) + "</p></button>";
+			if (x == 0 && (y == 1 || y == 3))
+			{
+				var data = document.createElement("td");
+				data.setAttribute("class","button_td");
+				row.appendChild(data);
+				continue;
 			}
+			
+			var data = document.createElement("td");
+			data.setAttribute("class","button_td");
+			
+			var btn_name = (y+x*w+1-map_names.length);
+			
+			if (y+x*w < map_names.length) {
+				btn_name = map_names[(y+x*w)];
+			}
+			
+			if (map_states[btn_i] == 0) {
+				data.innerHTML = "<button class='map_btn_red'><p class='map_btn_text'>" + btn_name + "</p></button>";
+			} else if (map_states[btn_i] == 1) {
+				data.innerHTML = "<button class='map_btn_avail' onclick='load_map(" + btn_i + ")'><p class='map_btn_text'>" + btn_name + "</p></button>";
+			} else if (map_states[btn_i] == 2) {
+				data.innerHTML = "<button class='map_btn_done' onclick='load_map(" + btn_i + ")'><p class='map_btn_text'>" + btn_name + "</p></button>";
+			}
+			
+			btn_i++;
 			
 			row.appendChild(data);
 		}
