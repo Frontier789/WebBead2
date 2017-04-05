@@ -2,19 +2,16 @@
 var canvas = document.getElementById("game_canvas");
 var ctx = canvas.getContext("2d");
 
-window.requestAnimFrame = (function() {
-	return  window.requestAnimationFrame       ||
-			window.webkitRequestAnimationFrame ||
-			window.mozRequestAnimationFrame    ||
-			function(callback) {
-				window.setTimeout(callback, 1000 / 30);
-			};
-})();
+window.requestAnimFrame = function(callback) {
+	
+	window.setTimeout(callback, 1000 / 60);
+			
+};
 
 var render = null;
 
 var animloop = function animloop() {
-	requestAnimFrame(animloop);
+	window.requestAnimFrame(animloop);
 	render();
 };
 
@@ -45,6 +42,10 @@ function vec2_t(x, y) {
 
 var vec2 = function(x, y) {
 	return new vec2_t(x,y);
+}
+
+var vec2i = function(x, y) {
+	return new vec2_t(Math.floor(x),Math.floor(y));
 }
 
 vec2_t.prototype = {
@@ -528,15 +529,15 @@ var LaserDraw = {
 var Field_size  = vec2(55,55);
 var Field_scale = 1;
 var FieldT = {
-	Laser      : {sprite_p: vec2(3,0), left: LaserT.Block,      top: LaserT.Block,      right: LaserT.Emit,       bottom: LaserT.Block      },
-	Mirror     : {sprite_p: vec2(2,0), left: LaserT.MirrorLeft, top: LaserT.MirrorRight,right: LaserT.MirrorLeft, bottom: LaserT.MirrorRight},
-	Gate       : {sprite_p: vec2(1,0), left: LaserT.Block,      top: LaserT.Pass,       right: LaserT.Block,      bottom: LaserT.Pass       },
-	Block      : {sprite_p: vec2(0,0), left: LaserT.Pass,       top: LaserT.Pass,       right: LaserT.Pass,       bottom: LaserT.Pass       },
-	MirrorPass : {sprite_p: vec2(0,1), left: LaserT.PassLeft,   top: LaserT.PassRight,  right: LaserT.PassLeft,   bottom: LaserT.PassRight  },
-	MirrorMono : {sprite_p: vec2(1,1), left: LaserT.FreeGoal,   top: LaserT.Block,      right: LaserT.MirrorLeft, bottom: LaserT.MirrorRight},
-	MirrorGoal : {sprite_p: vec2(2,1), left: LaserT.Goal,       top: LaserT.Block,      right: LaserT.MirrorLeft, bottom: LaserT.MirrorRight},
-	Goal       : {sprite_p: vec2(0,2), left: LaserT.Goal,       top: LaserT.Goal,       right: LaserT.Goal,       bottom: LaserT.Goal       },
-	Forbidden  : {sprite_p: vec2(3,1), left: LaserT.Block,      top: LaserT.Block,      right: LaserT.Block,      bottom: LaserT.Block      },
+	Laser      : {id: 1, sprite_p: vec2(3,0), left: LaserT.Block,      top: LaserT.Block,      right: LaserT.Emit,       bottom: LaserT.Block      },
+	Mirror     : {id: 2, sprite_p: vec2(2,0), left: LaserT.MirrorLeft, top: LaserT.MirrorRight,right: LaserT.MirrorLeft, bottom: LaserT.MirrorRight},
+	Gate       : {id: 3, sprite_p: vec2(1,0), left: LaserT.Block,      top: LaserT.Pass,       right: LaserT.Block,      bottom: LaserT.Pass       },
+	Block      : {id: 4, sprite_p: vec2(0,0), left: LaserT.Pass,       top: LaserT.Pass,       right: LaserT.Pass,       bottom: LaserT.Pass       },
+	MirrorPass : {id: 5, sprite_p: vec2(0,1), left: LaserT.PassLeft,   top: LaserT.PassRight,  right: LaserT.PassLeft,   bottom: LaserT.PassRight  },
+	MirrorMono : {id: 6, sprite_p: vec2(1,1), left: LaserT.FreeGoal,   top: LaserT.Block,      right: LaserT.MirrorLeft, bottom: LaserT.MirrorRight},
+	MirrorGoal : {id: 7, sprite_p: vec2(2,1), left: LaserT.Goal,       top: LaserT.Block,      right: LaserT.MirrorLeft, bottom: LaserT.MirrorRight},
+	Goal       : {id: 8, sprite_p: vec2(0,2), left: LaserT.Goal,       top: LaserT.Goal,       right: LaserT.Goal,       bottom: LaserT.Goal       },
+	Forbidden  : {id: 9, sprite_p: vec2(3,1), left: LaserT.Block,      top: LaserT.Block,      right: LaserT.Block,      bottom: LaserT.Block      },
 	getFromId: function(id) {
 		if (id == 1) return this.Laser     ;
 		if (id == 2) return this.Mirror    ;
@@ -613,7 +614,7 @@ Field.prototype = {
 					  this.type.sprite_p.x * Field_size.x + 0.5,this.type.sprite_p.y * Field_size.y + 0.5,
 					  Field_size.x - 1,Field_size.y - 1,
 					  0,0,
-					  Field_size.x * Field_scale * draw_scale,Field_size.y * Field_scale * draw_scale);
+					  Field_size.x * Field_scale * draw_scale + 0.5,Field_size.y * Field_scale * draw_scale + 0.5);
 					  
 		ctx.translate(Field_size.x * Field_scale/2 * draw_scale,Field_size.y * Field_scale/2 * draw_scale);
 		ctx.rotate(-rot / 180.0 * 3.141592);
@@ -641,7 +642,7 @@ var Drawer = {
 		drawGrid(vec2(itemPerRow,Math.floor(canvas.height / (Field_size.y * Field_scale))),
 				 Field_size.mul(Field_scale),
 				 vec2(canvas.width - this.width,this.offsety),
-				 ["#cfcfcf","#000000"],[1.5,0.1]);
+				 ["#cfcfcf","#dddddd"],[1.5,0.5]);
 		
 		var to_draw = [];
 		
@@ -842,7 +843,7 @@ var Map = {
 		}
 	},
 	set: function(p,item) {
-		if (this.fields[p.x][p.y].fixed == false) {
+		if (p.x != -1 && p.y != -1 && this.fields[p.x][p.y].fixed == false) {
 			
 			return this.forceSet(p,item);
 		}
@@ -891,15 +892,24 @@ var Map = {
 			var i = this.findIdFromPos(p); 
 			if (i.x != -1)
 			{
-				if (!this.fields[i.x][i.y].fixed)
+				var field = this.fields[i.x][i.y];
+				
+				if (!field.fixed)
 				{
 					dragField = this.remItem(i);
 					dragField.setDrawScale(1.05);
 					dragField.setPos(p);									
 				} else {
-					if (this.fields[i.x][i.y].field != null && this.fields[i.x][i.y].field.type == FieldT.Laser) {
-						playing = 1;
-						try_play(true);
+					if (su_mode) {
+						dragField = new Field(field.field.pos,field.field.type,field.field.rot);
+						dragField.setPos(p);
+					} else {
+						if (field.field != null && field.field.type == FieldT.Laser) {
+							if (playing == 0) {
+								playing = 1;
+								try_play(true);							
+							}
+						}						
 					}
 				}
 			}
@@ -996,8 +1006,10 @@ function PlayButtonTemplate(s1,s2,s3) {
 		
 	};
 	this.onRelease = function() {
-		playing = 1;
-		try_play(true);
+		if (playing == 0) {
+			playing = 1;
+			try_play(true);			
+		}
 	};
 };
 
@@ -1246,9 +1258,11 @@ var drawGrid = function(cell_count,cell_size,p,colors,widths) {
 	ctx.closePath();
 	
 	ctx.stroke();
+	ctx.stroke();
 	
 	
 	ctx.beginPath();
+	ctx.shadowBlur = 0;
 	ctx.lineWidth = widths[1];
 	ctx.strokeStyle = colors[1];
 	for (var x = 1;x < cell_count.x;x++) {
@@ -1298,8 +1312,12 @@ var handleDragDrop = function(p) {
 	}
 	else
 	{
-		Drawer.addItem(p,dragField);
-		dragField = null;
+		if (su_mode && p.x < canvas.width - Drawer.width - 10) {
+			dragField = null;
+		} else {
+			Drawer.addItem(p,dragField);
+			dragField = null;
+		}
 	}
 };
 
@@ -1341,6 +1359,56 @@ var ErrorSigner = {
 	}
 };
 
+/* * * * * * * * * * GOAL REQ DRAWER * * * * * * * * * */
+var GoalReq = {
+	text: "Célpontok száma:",
+	getGridPos: function() {
+		ctx.font="13px Verdana";
+		ctx.fillStyle = "#000000";
+		ctx.fillText(this.text,20,30);
+		var wText = ctx.measureText(this.text).width;
+		
+		return vec2(20 + wText / 2 - Field_size.mul(Field_scale).x / 2,50);
+	},
+	draw: function() {
+		ctx.font="13px Verdana";
+		ctx.fillStyle = "#000000";
+		ctx.shadowBlur = 0;
+		ctx.lineWidth  = 1;
+		ctx.fillText(this.text,20,30);
+		var wText = ctx.measureText(this.text).width;
+		
+		drawGrid(vec2(1,1),
+				 Field_size.mul(Field_scale),
+				 this.getGridPos(),
+				 ["#cfcfcf","#000000"],[1.5,0.1]);
+
+		ctx.font="30px Verdana";
+		ctx.fillStyle  = "#b30000";
+		ctx.shadowBlur = 3;
+		ctx.lineWidth  = 1;
+		ctx.shadowColor = "#ff4d4d";
+		var wNtarget = ctx.measureText(""+num_targets).width;	
+		
+		ctx.fillText(""+num_targets,20 + wText / 2 - wNtarget / 2,50 + Field_size.mul(Field_scale).y / 2 + 10);
+	},
+	handlePress: function(p) {
+		var pt = this.getGridPos();
+		var s  = Field_size.mul(Field_scale);
+		if (p.x > pt.x && p.x < pt.x + s.x && p.y > pt.y && p.y < pt.y + s.y) {
+			num_targets++;
+		}
+	},
+	handleRightPress: function(p) {
+		var pt = this.getGridPos();
+		var s  = Field_size.mul(Field_scale);
+		if (p.x > pt.x && p.x < pt.x + s.x && p.y > pt.y && p.y < pt.y + s.y) {
+			num_targets--;
+		}
+	}
+};
+
+
 /* * * * * * * * * * RENDERING METHOD * * * * * * * * * */
 render = function () {
 	
@@ -1352,29 +1420,14 @@ render = function () {
 	
 	Map.draw();
 	Drawer.draw();
+	LaserDraw.draw();
+	
+	GoalReq.draw();
+	
 	ErrorSigner.draw();
 	if (isDraggingField()) {
 		dragField.draw();
 	}
-	LaserDraw.draw();
-	
-	ctx.font="13px Verdana";
-	ctx.fillStyle = "#000000";
-	ctx.fillText("Célpontok száma:",20,30);
-	var wText = ctx.measureText("Célpontok száma:").width;
-	
-	drawGrid(vec2(1,1),
-			 Field_size.mul(Field_scale),
-			 vec2(20 + wText / 2 - Field_size.mul(Field_scale).x / 2,50),
-			 ["#cfcfcf","#000000"],[1.5,0.1]);
-
-	ctx.font="30px Verdana";
-	ctx.fillStyle = "#b30000";
-	ctx.shadowBlur = 3;
-	ctx.shadowColor = "#ff4d4d";
-	var wNtarget = ctx.measureText(""+num_targets).width;	
-	
-	ctx.fillText(""+num_targets,20 + wText / 2 - wNtarget / 2,50 + Field_size.mul(Field_scale).y / 2 + 10);
 	
 	
 	if (playing == 1) {
@@ -1426,18 +1479,31 @@ var try_play = function(start) {
 					}
 
 					var all_hit = true;
-
+					
 					for (x in Map.fields) {
 						for (y in Map.fields[x]) {
 							var field = Map.fields[x][y].field;
-							if (y.field != null && (y.field.type == FieldT.MirrorGoal || y.field.type == FieldT.Goal) && !y.field.washit) {
-								all_hit = false;
-								ErrorSigner.add(Map.getPosFromIndex(vec2(x,y)));
+							
+							if (field != null && (field.type == FieldT.MirrorGoal || field.type == FieldT.Goal)) {
+								if (!field.washit) {
+									all_hit = false;
+									ErrorSigner.add(Map.getPosFromIndex(vec2(x,y)));
+								}
 							}
 						}
 					}
 					
-					if (gates_done && all_hit && items_used) {
+					var all_used = true;
+					
+					if (Drawer.fields.length != 0) {
+						for (f in Drawer.fields) {
+							ErrorSigner.add(Drawer.getPosFromIndex(f));
+						}
+						
+						all_used = false;
+					}
+					
+					if (gates_done && all_hit && items_used && all_used) {
 						map_done();
 						gen_table();
 					} else {
@@ -1453,6 +1519,7 @@ var try_play = function(start) {
 						num_targets = target_needed;
 					}
 				} else {
+					ErrorSigner.add(GoalReq.getGridPos().add(Field_size.mul(Field_scale).div(2)));
 					num_targets = target_needed;
 				}
 				
@@ -1494,10 +1561,85 @@ var onMouseLeftPress = function(p) {
 			dragBegP  = p;
 			dragTime  = new Date();
 		}
+		if (su_mode) {
+			GoalReq.handlePress(p);
+		}
 	}
 }
 
+var su_mode = false;
+if (GameData[0].length > 3) {
+	su_mode = true;
+}
+
 window.onkeydown = function(e) {
+	if (e.keyCode == 80) // p
+	{
+		if (su_mode)
+		{
+			var text = "";
+			
+			var max_x = 0;
+			var max_y = 0;
+			
+			for (x in Map.fields) {
+				for (y in Map.fields[x]) {
+					if (!(x == (Map.fields.length - 1) || y == (Map.fields[x].length - 1))) {
+						var field = Map.fields[x][y];
+						if (field.field != null) {
+							max_x = Math.max(max_x,x);
+							max_y = Math.max(max_y,y);
+						}
+					}
+				}
+			}
+			
+			text = text + (max_x + 1) + "," + (max_y + 1) + "," + target_needed + ";EOL";
+			
+			var nullDb = 0;
+			
+			for (x in Map.fields) {
+				for (y in Map.fields[x]) {
+					if (x <= max_x && y <= max_y) {
+						var field = Map.fields[x][y].field;
+						if (field != null) {
+							if (nullDb > 0) {
+								text = text + "0,0,0,0," + nullDb + ";EOL";
+								nullDb = 0;
+							}
+							text = text + field.type.id + "," + field.rot + ",1,0;EOL";
+						} else {
+							nullDb++;
+						}
+					}
+				}
+			}
+			
+			if (nullDb > 0) {
+				text = text + "0,0,0,0," + nullDb + ";EOL";
+			}
+			
+			text = text + Drawer.fields.length + ";EOL";
+			for (f in Drawer.fields) {
+				if (f > 0) {
+					text = text + ",";
+				}
+				text = text + Drawer.fields[f].type.id;
+			}
+			text = text + ";EOL";
+			
+			var t = document.getElementById("gen_text");
+			
+			if (t == null) {
+				t = document.createElement("p");
+				t.setAttribute("id","gen_text");
+				document.body.appendChild(t);
+			}
+			
+			t.innerHTML = text.split("EOL").join("<br>");
+		}
+	}
+	
 	if (e.keyCode == 82) // r
 	{
 		if (isModyfingAllowed())
@@ -1517,19 +1659,20 @@ window.onkeydown = function(e) {
 		onMouseLeftPress(lastMouseP);
 	}
 	
-	if (e.keyCode == 65) 
+	if (e.keyCode == 65) // a
 	{
 		LaserDraw.step();
 	}
 	
-	if (e.keyCode == 66) 
+	if (e.keyCode == 66) // b
 	{
-		playing = 1;
-		playing = 1;
-		try_play(true);
+		if (playing == 0) {
+			playing = 1;
+			try_play(true);			
+		}
 	}
 	
-	if (e.keyCode == 67) 
+	if (e.keyCode == 81) // q
 	{
 		localStorage.clear();
 		map_states = [];
@@ -1550,10 +1693,15 @@ window.onkeydown = function(e) {
 		
 		if (isModyfingAllowed()) {
 			if (!isDraggingField()) {
-				if (n < Drawer.fields.length) {
-					dragMode = 2;
-					Drawer.handlePress(Drawer.getPosFromIndex(n));
-					dragField.setPos(lastMouseP);
+				
+				if (su_mode) {
+					dragField = new Field(lastMouseP,FieldT.getFromId(n),0,1.0);
+				} else {
+					if (n < Drawer.fields.length) {
+						dragMode = 2;
+						Drawer.handlePress(Drawer.getPosFromIndex(n));
+						dragField.setPos(lastMouseP);
+					}					
 				}
 			} else {
 				handleDragDrop(Drawer.getPosFromIndex(n).add(vec2(canvas.width,0)));
@@ -1606,6 +1754,10 @@ canvas.onmousedown = function(e) {
 				Drawer.handleRightPress(p);
 				Map.handleRightPress(p);
 			}
+		}
+		
+		if (su_mode) {
+			GoalReq.handleRightPress(p);
 		}
 	}
 	if (e.button == 0)

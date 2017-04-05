@@ -116,6 +116,7 @@ var gen_table = function() {
 	
 	safe_del(canvas);
 	safe_del(game_script);
+	safe_del(document.getElementById("gen_text"));
 
 	document.body.appendChild(table);
 };
