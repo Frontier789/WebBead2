@@ -1,5 +1,14 @@
 body {
-	text-align:center;
+	text-align: center;
+}
+
+.scaled_img {
+	width: 20px;
+    height: auto;
+}
+
+.desc_text {
+	text-align: center;
 }
 
 .game_title {

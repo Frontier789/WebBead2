@@ -114,6 +114,18 @@ var gen_table = function() {
 		table.appendChild(row);
 	}
 	
+	var desc_row = document.createElement("tr");
+	var desc_dat = document.createElement("td");
+	
+	desc_dat.setAttribute("colspan","5");
+	desc_row.setAttribute("class","desc_text");
+	desc_dat.innerHTML = `<p><img src='btns/btn_bckg_white.png' class='scaled_img' alt='white'></img> : feloldott pályák</p>
+						  <p><img src='btns/btn_bckg_green.png' class='scaled_img' alt='white'></img> : teljesített pályák</p>
+						  <p><img src='btns/btn_bckg_red.png' class='scaled_img' alt='white'></img> : nem feloldott pályák</p>`;
+	
+	desc_row.appendChild(desc_dat);
+	table.appendChild(desc_row);
+	
 	safe_del(canvas);
 	safe_del(game_script);
 	safe_del(document.getElementById("gen_text"));
