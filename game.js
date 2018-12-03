@@ -277,7 +277,7 @@ LaserPos.prototype = {
 		if (to_apply == LaserT.MirrorRight || to_apply == LaserT.PassRight) {
 			ret.push(new LaserPos(this.pos.add(this.rotRight(this.vel)),this.rotRight(this.vel))); 
 		}
-		if (field != null && field.type == FieldT.Gate && !field.washit) {
+		if (field != null && field.type == FieldT.Gate && to_apply == LaserT.Pass && !field.washit) {
 			field.washit = true;
 		}
 		if (to_apply == LaserT.Goal && !field.washit) {
@@ -1397,6 +1397,7 @@ var GoalReq = {
 		var s  = Field_size.mul(Field_scale);
 		if (p.x > pt.x && p.x < pt.x + s.x && p.y > pt.y && p.y < pt.y + s.y) {
 			num_targets++;
+			target_needed++;
 		}
 	},
 	handleRightPress: function(p) {
@@ -1404,6 +1405,7 @@ var GoalReq = {
 		var s  = Field_size.mul(Field_scale);
 		if (p.x > pt.x && p.x < pt.x + s.x && p.y > pt.y && p.y < pt.y + s.y) {
 			num_targets--;
+			target_needed--;
 		}
 	}
 };
@@ -1598,8 +1600,8 @@ window.onkeydown = function(e) {
 			
 			var nullDb = 0;
 			
-			for (x in Map.fields) {
-				for (y in Map.fields[x]) {
+			for (var y = 0;y < Map.size.y;y++) {
+				for (var x = 0;x < Map.size.x;x++) {
 					if (x <= max_x && y <= max_y) {
 						var field = Map.fields[x][y].field;
 						if (field != null) {
