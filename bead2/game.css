@@ -1,0 +1,301 @@
+body {
+	overflow: hidden;
+}
+
+table {
+	margin: 0px auto;
+}
+
+td {
+	text-align: center;
+}
+
+#upload_from {
+	margin-top: 15px;
+}
+
+#logouta {
+	float: right;
+}
+
+#cancel_btn {
+	float: right;
+}
+
+#logged_inas_p {
+	margin-top: 0px;
+	margin-bottom: 1px;
+	font-size: 0.95em;
+}
+
+#logged_in_txt {
+	background-color: #f8f8f6;
+	padding: 3px;
+	border-radius: 2px;
+}
+
+#logged_in_user {
+	font-weight: bold;
+	color: #660000;
+}
+
+#logged_in_warning {
+	font-weight: bold;
+	font-size: 0.8em;
+	color: #868695;
+}
+
+#logged_inas_p a:hover {
+	color: #b70206;
+	border: 1px solid;
+}
+
+#logged_inas_p a {
+	color: #660002;
+	border: 1px solid;
+	border-color: #cecebf;
+    font-family: Georgia, "Times New Roman", Times, serif;
+    
+    text-decoration: none;
+}
+
+.op0t {
+	opacity: 0;
+	transition: all 0.3s linear;
+}
+
+.op1t {
+	opacity: 1;
+	transition: all 0.3s linear;
+}
+
+.float_by {
+	position: absolute;
+	font-size: 0.7em;
+	bottom: 2px;
+	right: 2px;
+}
+
+.float_del {
+	position: absolute;
+	top: 2px;
+	right: 2px;
+}
+
+.float_del:hover {
+	color: red;
+}
+
+.tooltip {
+    position: relative;
+	color: #0000ff;
+}
+
+.tooltip .tooltiptext {
+    visibility: hidden;
+    width: 120px;
+    background-color: #555;
+    color: #fff;
+    text-align: center;
+    border-radius: 6px;
+    padding: 5px 0;
+    position: absolute;
+    z-index: 1;
+    top: 100%;
+    left: 50%;
+    margin-left: -60px;
+    opacity: 0;
+    transition: all 0.3s;
+}
+
+.tooltip:hover .tooltiptext {
+    visibility: visible;
+    opacity: 1;
+    transition: all 0.3s;
+}
+
+.solved_p {
+	margin-top: 0;
+	margin-bottom: 0px;
+	font-size: 0.7em;
+	color: #8c8c00;
+}
+
+.solvedc_p {
+	margin-top: 0;
+	margin-bottom: 0px;
+	font-size: 0.7em;
+}
+
+.del_btn {
+	text-align: center;
+	width: 100px;
+	background-color: #dbdbea;
+	border-style: solid;
+	border-width: 2px;
+	border-radius: 4px 4px 0px 0px;
+    border-color: #000000;
+    transition: all 0.2s linear;
+	cursor: pointer;
+}
+
+.del_btn:hover {
+	background-color: #f9a4a6;
+    transition: all 0.2s linear;
+}
+
+.del_btn:active {
+	background-color: #d93600;
+    transition: all 0.2s linear;
+}
+
+.del_btn_dis {
+	text-decoration:line-through;
+	text-align: center;
+	width: 100px;
+	background-color: #dbdbea;
+	border-style: solid;
+	border-width: 2px;
+	border-radius: 4px 4px 0px 0px;
+    border-color: #757584;
+    transition: all 0.2s linear;
+	cursor: hand;
+}
+
+.del_btn_dis:hover {
+	background-color: #cacad9;
+    transition: all 0.2s linear;
+}
+
+.del_btn_dis:active {
+	background-color: #b9b9c8;
+    transition: all 0.2s linear;
+}
+
+.map_btn {
+	position: relative;
+	text-align: center;
+	height: 100px;
+	width: 100px;
+	background-color: #8080ff;
+	border-style: solid;
+	border-width: 4.2px;
+	border-radius: 0px 0px 4px 4px;
+    border-color: #b30000;
+    transition: all 0.2s linear;
+}
+
+.map_btn:hover {
+	background-color: #9a9aff;
+	cursor: pointer;
+}
+
+.map_btn:active {
+	background-color: #6767ff;
+}
+
+.solved_map {
+	background-color: #8cff8c;
+}
+
+.solved_map:hover {
+	background-color: #bfffbf;
+}
+
+.solved_map:active {
+	background-color: #59ff59;
+}
+
+.map_difficulty_0 { border-color: #b9b9c8; }
+.map_difficulty_1 { border-color: #a8a8b7; }
+.map_difficulty_2 { border-color: #9797a6; }
+.map_difficulty_3 { border-color: #868695; }
+
+.map_difficulty_0:hover { border-color: #b9b9c8; transition: all 0.3s ease-in-out;}
+.map_difficulty_1:hover { border-color: #b9b9c8; transition: all 0.3s ease-in-out;}
+.map_difficulty_2:hover { border-color: #b9b9c8; transition: all 0.3s ease-in-out;}
+.map_difficulty_3:hover { border-color: #b9b9c8; transition: all 0.3s ease-in-out;}
+
+.map_difficulty_0:active{ border-width: 4px; }
+.map_difficulty_1:active{ border-width: 4px; }
+.map_difficulty_2:active{ border-width: 4px; }
+.map_difficulty_3:active{ border-width: 4px; }
+
+form {
+    max-width: 500px;
+    background: #f4f7f8;
+    margin: 10px auto;
+    padding: 10px;
+    background: #f4f7f8;
+    border-radius: 8px;
+    font-family: Georgia, "Times New Roman", Times, serif;
+}
+
+form  input[type="text"],
+form  select {
+    font-family: Georgia, "Times New Roman", Times, serif;
+    background: rgba(255,255,255,.1);
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    margin: 0;
+    outline: 0;
+    padding: 7px;
+    box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    background-color: #e8eeef;
+    color:#8a97a0;
+    -webkit-box-shadow: 0 1px 0 rgba(0,0,0,0.03) inset;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.03) inset;
+    margin-bottom: 10px;
+}
+
+form  input[type="button"] {
+    position: relative;
+    padding: 13px 33px 12px 33px;
+    color: #FFF;
+    margin: 0 auto;
+    font-size: 18px;
+    text-align: center;
+    font-style: normal;
+    margin-bottom: 10px;
+	transition: all 0.2s linear;
+}
+
+form  input[type="button"]:hover {
+	transition: all 0.2s linear;
+	cursor: pointer;
+}
+
+form  input[type="button"]:active {
+	transition: all 0.2s linear;
+}
+
+.uploadbtn {
+    background: #1abc9c;
+    border: 1px solid #16a085;
+    border-width: 1px 1px 3px;
+}
+
+.uploadbtn:hover {
+    background: #109177;
+}
+
+.uploadbtn:active {
+    background: #0d7a64;
+}
+
+.cancelbtn {
+    background: #1696c0;
+    border: 1px solid #1072a7;
+    border-width: 1px 1px 3px;
+}
+
+.cancelbtn:hover {
+    background: #116791;
+}
+
+.cancelbtn:active {
+    background: #0b417d;
+}
